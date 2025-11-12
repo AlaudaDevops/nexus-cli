@@ -1,0 +1,49 @@
+{{- if .Users }}
+{{- range .Users }}
+# ========================================
+# 用户: {{ .UserID }}
+# ========================================
+
+toolchains:
+  nexus:
+    endpoint: {{ $.Endpoint }}
+    host: {{ $.Host }}
+    port: {{ $.Port }}
+    scheme: {{ $.Scheme }}
+    username: {{ .UserID }}
+    password: {{ .Password }}
+    {{- if $.Repositories }}
+    repositories:
+      {{- range $.Repositories }}
+      - name: {{ .Name }}
+        format: {{ .Format }}
+        type: {{ .Type }}
+        url: {{ .URL }}
+      {{- end }}
+    {{- end }}
+
+---
+{{- end }}
+{{- else }}
+# ========================================
+# Nexus 仓库配置
+# ========================================
+
+toolchains:
+  nexus:
+    endpoint: {{ .Endpoint }}
+    host: {{ .Host }}
+    port: {{ .Port }}
+    scheme: {{ .Scheme }}
+    username: admin
+    password: password
+    {{- if .Repositories }}
+    repositories:
+      {{- range .Repositories }}
+      - name: {{ .Name }}
+        format: {{ .Format }}
+        type: {{ .Type }}
+        url: {{ .URL }}
+      {{- end }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,96 @@
+# 团队仓库配置
+# 此配置由团队仓库管理员（team1-repo-manager）执行
+# 用于创建和管理团队自己的仓库
+
+# 注意：执行此配置时需要使用团队仓库管理员的凭证
+# export NEXUS_USERNAME=team1-repo-manager
+# export NEXUS_PASSWORD=Team1Repo123
+
+# Team1 的仓库
+repositories:
+  # Maven Hosted 仓库
+  - name: "team1-maven-releases"
+    format: "maven2"
+    type: "hosted"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+      writePolicy: "ALLOW_ONCE"
+    maven:
+      versionPolicy: "RELEASE"
+      layoutPolicy: "STRICT"
+
+  - name: "team1-maven-snapshots"
+    format: "maven2"
+    type: "hosted"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+      writePolicy: "ALLOW"
+    maven:
+      versionPolicy: "SNAPSHOT"
+      layoutPolicy: "STRICT"
+
+  # Python Hosted 仓库
+  - name: "team1-pypi-hosted"
+    format: "pypi"
+    type: "hosted"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+      writePolicy: "ALLOW"
+
+  # Go Proxy 仓库
+  - name: "team1-go-proxy"
+    format: "go"
+    type: "proxy"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+    proxy:
+      remoteUrl: "https://goproxy.cn"
+      contentMaxAge: 1440
+      metadataMaxAge: 1440
+
+# 为团队成员分配仓库权限
+# 可用的权限类型（小写）：
+#   - browse: 浏览仓库
+#   - read: 读取/下载制品
+#   - add: 上传制品
+#   - edit: 编辑/更新制品
+#   - delete: 删除制品
+userRepositoryPermissions:
+  # team1-dev1 对 Maven 仓库的权限
+  - userId: "team1-dev1"
+    repository: "team1-maven-releases"
+    privileges:
+      - "browse"  # 浏览仓库
+      - "read"    # 下载制品
+      - "add"     # 上传制品
+
+  - userId: "team1-dev1"
+    repository: "team1-maven-snapshots"
+    privileges:
+      - "browse"  # 浏览仓库
+      - "read"    # 下载制品
+      - "add"     # 上传制品
+      - "edit"    # 编辑制品
+
+  # team1-dev1 对 Python 仓库的权限
+  - userId: "team1-dev1"
+    repository: "team1-pypi-hosted"
+    privileges:
+      - "browse"  # 浏览仓库
+      - "read"    # 下载包
+      - "add"     # 上传包
+
+  # team1-dev1 对 Go 仓库的权限
+  - userId: "team1-dev1"
+    repository: "team1-go-proxy"
+    privileges:
+      - "browse"  # 浏览仓库
+      - "read"    # 下载模块

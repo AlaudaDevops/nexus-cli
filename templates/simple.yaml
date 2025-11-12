@@ -1,0 +1,21 @@
+# 简单输出模板 - 只输出名称
+
+users: |
+  {{- range . }}
+  - {{ .UserID }}
+  {{- end }}
+
+repositories: |
+  {{- range . }}
+  - {{ .Name }}
+  {{- end }}
+
+roles: |
+  {{- range . }}
+  - {{ .ID }}
+  {{- end }}
+
+privileges: |
+  {{- range . }}
+  - {{ .Name }}
+  {{- end }}

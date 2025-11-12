@@ -1,0 +1,67 @@
+# 详细输出模板 - 包含所有字段
+
+users: |
+  {{- range . }}
+  - userId: {{ .UserID }}
+    firstName: {{ .FirstName }}
+    lastName: {{ .LastName }}
+    emailAddress: {{ .EmailAddress }}
+    status: {{ .Status }}
+    source: {{ .Source }}
+    roles:
+    {{- range .Roles }}
+      - {{ . }}
+    {{- end }}
+  {{- end }}
+
+repositories: |
+  {{- range . }}
+  - name: {{ .Name }}
+    format: {{ .Format }}
+    type: {{ .Type }}
+    online: {{ .Online }}
+    url: {{ .URL }}
+    storage:
+      blobStoreName: {{ .BlobStoreName }}
+      strictContentTypeValidation: {{ .StrictContentTypeValidation }}
+    {{- if .WritePolicy }}
+      writePolicy: {{ .WritePolicy }}
+    {{- end }}
+  {{- end }}
+
+roles: |
+  {{- range . }}
+  - id: {{ .ID }}
+    name: {{ .Name }}
+    description: {{ .Description }}
+    source: {{ .Source }}
+    readOnly: {{ .ReadOnly }}
+    privileges:
+    {{- range .Privileges }}
+      - {{ . }}
+    {{- end }}
+    {{- if .Roles }}
+    roles:
+    {{- range .Roles }}
+      - {{ . }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+
+privileges: |
+  {{- range . }}
+  - name: {{ .Name }}
+    description: {{ .Description }}
+    type: {{ .Type }}
+    {{- if .Format }}
+    format: {{ .Format }}
+    {{- end }}
+    {{- if .Repository }}
+    repository: {{ .Repository }}
+    {{- end }}
+    readOnly: {{ .ReadOnly }}
+    actions:
+    {{- range .Actions }}
+      - {{ . }}
+    {{- end }}
+  {{- end }}

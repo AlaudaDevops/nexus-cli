@@ -1,0 +1,188 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+    paths:
+      - 'cmd/**'
+      - 'pkg/**'
+      - 'main.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            os: ubuntu-latest
+          - goos: linux
+            goarch: arm64
+            os: ubuntu-latest
+          - goos: darwin
+            goarch: amd64
+            os: macos-latest
+          - goos: darwin
+            goarch: arm64
+            os: macos-latest
+          - goos: windows
+            goarch: amd64
+            os: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=$(git rev-parse --short HEAD)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          LDFLAGS="-s -w -X github.com/alauda/nexus-cli/cmd.Version=${VERSION} -X github.com/alauda/nexus-cli/cmd.GitCommit=${GIT_COMMIT} -X github.com/alauda/nexus-cli/cmd.BuildDate=${BUILD_DATE}"
+
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            OUTPUT_NAME="nexus-cli-${{ matrix.goos }}-${{ matrix.goarch }}.exe"
+          else
+            OUTPUT_NAME="nexus-cli-${{ matrix.goos }}-${{ matrix.goarch }}"
+          fi
+
+          go build -ldflags "$LDFLAGS" -o "$OUTPUT_NAME" main.go
+          echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
+
+      - name: Generate checksum (Unix)
+        if: matrix.goos != 'windows'
+        run: |
+          shasum -a 256 ${{ env.OUTPUT_NAME }} > ${{ env.OUTPUT_NAME }}.sha256
+
+      - name: Generate checksum (Windows)
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          $hash = Get-FileHash -Algorithm SHA256 -Path "${{ env.OUTPUT_NAME }}"
+          "$($hash.Hash.ToLower())  ${{ env.OUTPUT_NAME }}" | Out-File -FilePath "${{ env.OUTPUT_NAME }}.sha256" -Encoding ASCII
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            nexus-cli-*
+            *.sha256
+          retention-days: 7
+
+  release:
+    name: Create Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -type f -name 'nexus-cli-*' -exec cp {} release/ \;
+          ls -lh release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            ### Linux (amd64)
+            ```bash
+            wget https://github.com/alauda/nexus-cli/releases/download/${{ github.ref_name }}/nexus-cli-linux-amd64
+            chmod +x nexus-cli-linux-amd64
+            sudo mv nexus-cli-linux-amd64 /usr/local/bin/nexus-cli
+            ```
+
+            ### Linux (arm64)
+            ```bash
+            wget https://github.com/alauda/nexus-cli/releases/download/${{ github.ref_name }}/nexus-cli-linux-arm64
+            chmod +x nexus-cli-linux-arm64
+            sudo mv nexus-cli-linux-arm64 /usr/local/bin/nexus-cli
+            ```
+
+            ### macOS (amd64)
+            ```bash
+            wget https://github.com/alauda/nexus-cli/releases/download/${{ github.ref_name }}/nexus-cli-darwin-amd64
+            chmod +x nexus-cli-darwin-amd64
+            sudo mv nexus-cli-darwin-amd64 /usr/local/bin/nexus-cli
+            ```
+
+            ### macOS (arm64 / Apple Silicon)
+            ```bash
+            wget https://github.com/alauda/nexus-cli/releases/download/${{ github.ref_name }}/nexus-cli-darwin-arm64
+            chmod +x nexus-cli-darwin-arm64
+            sudo mv nexus-cli-darwin-arm64 /usr/local/bin/nexus-cli
+            ```
+
+            ### Windows (amd64)
+            Download `nexus-cli-windows-amd64.exe` and add it to your PATH.
+
+            ## Verify Installation
+            ```bash
+            nexus-cli version
+            ```
+
+            ## Documentation
+            - [README](https://github.com/alauda/nexus-cli/blob/main/README.md)
+            - [Quick Start](https://github.com/alauda/nexus-cli/blob/main/QUICKSTART.md)
+            - [中文文档](https://github.com/alauda/nexus-cli/blob/main/README_CN.md)
+
+            ## Checksums
+            SHA256 checksums are provided for each binary in the release files.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

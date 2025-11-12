@@ -1,0 +1,213 @@
+# 仓库管理员配置
+# 包含仓库管理角色和 Maven、Go、Python 仓库示例
+
+# 创建仓库管理员角色
+roles:
+  - id: "repository-manager"
+    name: "Repository Manager"
+    description: "仓库管理员 - 拥有仓库的增删改查权限"
+    privileges:
+      # 仓库浏览权限
+      - "nx-repository-view-*-*-browse"
+      - "nx-repository-view-*-*-read"
+      # 仓库管理权限
+      - "nx-repository-admin-*-*-*"
+      # 仓库创建/删除/更新权限
+      - "nx-apikey-all"
+
+# 创建仓库管理员用户
+users:
+  - id: "repo-admin"
+    firstName: "Repository"
+    lastName: "Admin"
+    emailAddress: "repo-admin@example.com"
+    password: "RepoAdmin123"
+    status: "active"
+    roles:
+      - "repository-manager"
+
+# Maven Hosted 仓库
+repositories:
+  # Maven Releases 仓库
+  - name: "maven-releases"
+    format: "maven2"
+    type: "hosted"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+      writePolicy: "ALLOW_ONCE"  # 只允许发布一次，防止覆盖
+    maven:
+      versionPolicy: "RELEASE"
+      layoutPolicy: "STRICT"
+
+  # Maven Snapshots 仓库
+  - name: "maven-snapshots"
+    format: "maven2"
+    type: "hosted"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+      writePolicy: "ALLOW"  # 允许覆盖快照版本
+    maven:
+      versionPolicy: "SNAPSHOT"
+      layoutPolicy: "STRICT"
+
+  # Maven Central 代理仓库
+  - name: "maven-central-proxy"
+    format: "maven2"
+    type: "proxy"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+    proxy:
+      remoteUrl: "https://repo1.maven.org/maven2/"
+      contentMaxAge: 1440
+      metadataMaxAge: 1440
+    maven:
+      versionPolicy: "RELEASE"
+      layoutPolicy: "STRICT"
+
+  # Python (PyPI) Hosted 仓库
+  - name: "pypi-hosted"
+    format: "pypi"
+    type: "hosted"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+      writePolicy: "ALLOW_ONCE"
+
+  # Python (PyPI) Proxy 仓库 - 代理 PyPI 官方源
+  - name: "pypi-proxy"
+    format: "pypi"
+    type: "proxy"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+    proxy:
+      remoteUrl: "https://pypi.org"
+      contentMaxAge: 1440
+      metadataMaxAge: 1440
+
+  # Python (PyPI) Group 仓库 - 聚合本地和代理仓库
+  - name: "pypi-group"
+    format: "pypi"
+    type: "group"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+
+  # Go Proxy 仓库 - 代理 Go 官方源
+  - name: "go-proxy"
+    format: "go"
+    type: "proxy"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+    proxy:
+      remoteUrl: "https://proxy.golang.org"
+      contentMaxAge: 1440
+      metadataMaxAge: 1440
+
+  # Go Group 仓库
+  - name: "go-group"
+    format: "go"
+    type: "group"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+
+# 为普通开发者创建权限
+privileges:
+  - name: "maven-developer-privilege"
+    description: "Maven repositories developer access"
+    type: "repository-view"
+    format: "maven2"
+    repository: "*"
+    actions:
+      - "READ"
+      - "BROWSE"
+      - "ADD"
+      - "EDIT"
+
+  - name: "pypi-developer-privilege"
+    description: "PyPI repositories developer access"
+    type: "repository-view"
+    format: "pypi"
+    repository: "*"
+    actions:
+      - "READ"
+      - "BROWSE"
+      - "ADD"
+      - "EDIT"
+
+  - name: "go-developer-privilege"
+    description: "Go repositories developer access"
+    type: "repository-view"
+    format: "go"
+    repository: "*"
+    actions:
+      - "READ"
+      - "BROWSE"
+
+# 开发者角色（不同于管理员）
+roles:
+  - id: "developer"
+    name: "Developer"
+    description: "开发者角色 - 可以使用仓库但不能管理"
+    privileges:
+      - "maven-developer-privilege"
+      - "pypi-developer-privilege"
+      - "go-developer-privilege"
+
+# 创建普通开发者用户示例
+users:
+  - id: "developer1"
+    firstName: "Developer"
+    lastName: "One"
+    emailAddress: "dev1@example.com"
+    password: "Dev123456"
+    status: "active"
+    roles:
+      - "developer"
+
+# 用户仓库权限映射
+userRepositoryPermissions:
+  # 开发者对 Maven releases 仓库的权限
+  - userId: "developer1"
+    repository: "maven-releases"
+    privileges:
+      - "READ"
+      - "BROWSE"
+      - "ADD"
+
+  # 开发者对 Maven snapshots 仓库的权限
+  - userId: "developer1"
+    repository: "maven-snapshots"
+    privileges:
+      - "READ"
+      - "BROWSE"
+      - "ADD"
+      - "EDIT"
+
+  # 开发者对 PyPI hosted 仓库的权限
+  - userId: "developer1"
+    repository: "pypi-hosted"
+    privileges:
+      - "READ"
+      - "BROWSE"
+      - "ADD"
+
+  # 开发者对 Go proxy 仓库的权限（只读）
+  - userId: "developer1"
+    repository: "go-proxy"
+    privileges:
+      - "READ"
+      - "BROWSE"
