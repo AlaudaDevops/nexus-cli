@@ -69,4 +69,4 @@ jobs:
         run: make build
 
       - name: Verify build
-        run: ./nexus-cli --version
+        run: ./nexus-cli version

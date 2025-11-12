@@ -12,6 +12,10 @@ var (
 	cfgFile string
 )
 
+var (
+	showVersion bool
+)
+
 // rootCmd 根命令
 var rootCmd = &cobra.Command{
 	Use:   "nexus-cli",
@@ -23,16 +27,28 @@ Set these environment variables before using:
   NEXUS_URL      - Nexus server URL (e.g., http://localhost:8081)
   NEXUS_USERNAME - Admin username
   NEXUS_PASSWORD - Admin password`,
+	Run: func(_ *cobra.Command, _ []string) {
+		if showVersion {
+			printVersion()
+		}
+	},
 }
 
 // Execute 执行根命令
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (required)")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Print version information")
+}
+
+func printVersion() {
+	fmt.Printf("nexus-cli version %s\n", Version)
+	fmt.Printf("Git commit: %s\n", GitCommit)
+	fmt.Printf("Build date: %s\n", BuildDate)
 }
