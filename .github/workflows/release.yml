@@ -2,46 +2,53 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
-      - develop
-    tags:
-      - 'v*'
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
     paths:
       - 'cmd/**'
       - 'pkg/**'
       - 'main.go'
       - 'go.mod'
       - 'go.sum'
-      - 'Makefile'
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
+    paths:
+      - 'cmd/**'
+      - 'pkg/**'
+      - 'main.go'
+      - 'go.mod'
+      - 'go.sum'
 
-permissions:
-  contents: read
+env:
+  BINARY_NAME: nexus-cli
 
 jobs:
   build:
-    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    name: Build Binary
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     strategy:
       matrix:
         include:
-          - goos: linux
+          # Linux
+          - os: ubuntu-latest
+            goos: linux
             goarch: amd64
-            os: ubuntu-latest
-          - goos: linux
+            artifact_name: nexus-cli-linux-amd64
+          - os: ubuntu-latest
+            goos: linux
             goarch: arm64
-            os: ubuntu-latest
-          - goos: darwin
+            artifact_name: nexus-cli-linux-arm64
+          # macOS
+          - os: macos-latest
+            goos: darwin
             goarch: amd64
-            os: macos-latest
-          - goos: darwin
+            artifact_name: nexus-cli-darwin-amd64
+          - os: macos-latest
+            goos: darwin
             goarch: arm64
-            os: macos-latest
+            artifact_name: nexus-cli-darwin-arm64
 
     steps:
       - name: Checkout code
@@ -55,16 +62,16 @@ jobs:
           go-version: '1.21'
           cache: true
 
-      - name: Get version
+      - name: Get version info
         id: version
         shell: bash
         run: |
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION=$(git rev-parse --short HEAD)
-          fi
+          VERSION=${GITHUB_REF#refs/tags/}
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
       - name: Build binary
@@ -73,33 +80,26 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-          GIT_COMMIT=$(git rev-parse --short HEAD)
-          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          LDFLAGS="-s -w -X github.com/alauda/nexus-cli/cmd.Version=${VERSION} -X github.com/alauda/nexus-cli/cmd.GitCommit=${GIT_COMMIT} -X github.com/alauda/nexus-cli/cmd.BuildDate=${BUILD_DATE}"
-          OUTPUT_NAME="nexus-cli-${{ matrix.goos }}-${{ matrix.goarch }}"
-
-          go build -ldflags "$LDFLAGS" -o "$OUTPUT_NAME" main.go
-          echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
+          LDFLAGS="-s -w -X github.com/alauda/nexus-cli/cmd.Version=${{ steps.version.outputs.version }} -X github.com/alauda/nexus-cli/cmd.GitCommit=${{ steps.version.outputs.git_commit }} -X github.com/alauda/nexus-cli/cmd.BuildDate=${{ steps.version.outputs.build_date }}"
+          go build -ldflags "$LDFLAGS" -o "${{ matrix.artifact_name }}" main.go
 
       - name: Generate checksum
-        run: |
-          shasum -a 256 ${{ env.OUTPUT_NAME }} > ${{ env.OUTPUT_NAME }}.sha256
+        run: shasum -a 256 ${{ matrix.artifact_name }} > ${{ matrix.artifact_name }}.sha256
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: ${{ matrix.artifact_name }}
           path: |
-            nexus-cli-*
-            *.sha256
+            ${{ matrix.artifact_name }}
+            ${{ matrix.artifact_name }}.sha256
           retention-days: 7
 
   release:
     name: Create Release
-    if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     steps:
@@ -123,7 +123,7 @@ jobs:
           files: release/*
           generate_release_notes: true
           body: |
-            ## Installation
+            ## 安装说明 / Installation Guide
 
             ### Linux (amd64)
             ```bash
@@ -139,31 +139,32 @@ jobs:
             sudo mv nexus-cli-linux-arm64 /usr/local/bin/nexus-cli
             ```
 
-            ### macOS (amd64)
+            ### macOS (Intel)
             ```bash
             wget https://github.com/alauda/nexus-cli/releases/download/${{ github.ref_name }}/nexus-cli-darwin-amd64
             chmod +x nexus-cli-darwin-amd64
             sudo mv nexus-cli-darwin-amd64 /usr/local/bin/nexus-cli
             ```
 
-            ### macOS (arm64 / Apple Silicon)
+            ### macOS (Apple Silicon)
             ```bash
             wget https://github.com/alauda/nexus-cli/releases/download/${{ github.ref_name }}/nexus-cli-darwin-arm64
             chmod +x nexus-cli-darwin-arm64
             sudo mv nexus-cli-darwin-arm64 /usr/local/bin/nexus-cli
             ```
 
-            ## Verify Installation
+            ## 验证安装 / Verify Installation
             ```bash
             nexus-cli version
             ```
 
-            ## Documentation
+            ## 文档 / Documentation
             - [README](https://github.com/alauda/nexus-cli/blob/main/README.md)
-            - [Quick Start](https://github.com/alauda/nexus-cli/blob/main/QUICKSTART.md)
+            - [快速开始 / Quick Start](https://github.com/alauda/nexus-cli/blob/main/QUICKSTART.md)
             - [中文文档](https://github.com/alauda/nexus-cli/blob/main/README_CN.md)
 
-            ## Checksums
-            SHA256 checksums are provided for each binary in the release files.
+            ## 校验和 / Checksums
+            每个二进制文件都提供了 SHA256 校验和文件。
+            SHA256 checksums are provided for each binary.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
