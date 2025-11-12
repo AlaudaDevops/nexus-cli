@@ -42,9 +42,6 @@ jobs:
           - goos: darwin
             goarch: arm64
             os: macos-latest
-          - goos: windows
-            goarch: amd64
-            os: windows-latest
 
     steps:
       - name: Checkout code
@@ -80,27 +77,14 @@ jobs:
           GIT_COMMIT=$(git rev-parse --short HEAD)
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           LDFLAGS="-s -w -X github.com/alauda/nexus-cli/cmd.Version=${VERSION} -X github.com/alauda/nexus-cli/cmd.GitCommit=${GIT_COMMIT} -X github.com/alauda/nexus-cli/cmd.BuildDate=${BUILD_DATE}"
-
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            OUTPUT_NAME="nexus-cli-${{ matrix.goos }}-${{ matrix.goarch }}.exe"
-          else
-            OUTPUT_NAME="nexus-cli-${{ matrix.goos }}-${{ matrix.goarch }}"
-          fi
+          OUTPUT_NAME="nexus-cli-${{ matrix.goos }}-${{ matrix.goarch }}"
 
           go build -ldflags "$LDFLAGS" -o "$OUTPUT_NAME" main.go
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
 
-      - name: Generate checksum (Unix)
-        if: matrix.goos != 'windows'
+      - name: Generate checksum
         run: |
           shasum -a 256 ${{ env.OUTPUT_NAME }} > ${{ env.OUTPUT_NAME }}.sha256
-
-      - name: Generate checksum (Windows)
-        if: matrix.goos == 'windows'
-        shell: pwsh
-        run: |
-          $hash = Get-FileHash -Algorithm SHA256 -Path "${{ env.OUTPUT_NAME }}"
-          "$($hash.Hash.ToLower())  ${{ env.OUTPUT_NAME }}" | Out-File -FilePath "${{ env.OUTPUT_NAME }}.sha256" -Encoding ASCII
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -168,9 +152,6 @@ jobs:
             chmod +x nexus-cli-darwin-arm64
             sudo mv nexus-cli-darwin-arm64 /usr/local/bin/nexus-cli
             ```
-
-            ### Windows (amd64)
-            Download `nexus-cli-windows-amd64.exe` and add it to your PATH.
 
             ## Verify Installation
             ```bash
