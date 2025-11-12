@@ -1,3 +1,4 @@
+// Package service provides business logic for applying Nexus configurations.
 package service
 
 import (
@@ -18,16 +19,16 @@ type DeleteService struct {
 
 // DeleteResult 删除结果
 type DeleteResult struct {
-	Total              int
-	Success            int
-	Failed             int
-	Skipped            int
-	UsersDeleted       int
+	Total               int
+	Success             int
+	Failed              int
+	Skipped             int
+	UsersDeleted        int
 	RepositoriesDeleted int
-	RolesDeleted       int
-	PrivilegesDeleted  int
-	Errors             []string
-	Warnings           []string
+	RolesDeleted        int
+	PrivilegesDeleted   int
+	Errors              []string
+	Warnings            []string
 }
 
 // NewDeleteService 创建删除服务

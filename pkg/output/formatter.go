@@ -1,3 +1,4 @@
+// Package output provides formatting and output functionality for Nexus CLI.
 package output
 
 import (
@@ -11,15 +12,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Format 输出格式类型
+// Format represents the output format type.
 type Format string
 
 const (
-	FormatText     Format = "text"     // 纯文本格式
-	FormatJSON     Format = "json"     // JSON 格式
-	FormatYAML     Format = "yaml"     // YAML 格式
-	FormatTemplate Format = "template" // 自定义模板格式
-	FormatTable    Format = "table"    // 表格格式
+	// FormatText represents plain text format
+	FormatText Format = "text"
+	// FormatJSON represents JSON format
+	FormatJSON Format = "json"
+	// FormatYAML represents YAML format
+	FormatYAML Format = "yaml"
+	// FormatTemplate represents custom template format
+	FormatTemplate Format = "template"
+	// FormatTable represents table format
+	FormatTable Format = "table"
 )
 
 // Formatter 输出格式化器
@@ -57,7 +63,7 @@ func (f *Formatter) Print(message string) {
 	if f.quiet {
 		return
 	}
-	fmt.Fprintln(f.writer, message)
+	_, _ = fmt.Fprintln(f.writer, message)
 }
 
 // Printf 格式化打印
@@ -65,7 +71,7 @@ func (f *Formatter) Printf(format string, args ...interface{}) {
 	if f.quiet {
 		return
 	}
-	fmt.Fprintf(f.writer, format, args...)
+	_, _ = fmt.Fprintf(f.writer, format, args...)
 }
 
 // Success 打印成功消息
@@ -73,12 +79,12 @@ func (f *Formatter) Success(message string) {
 	if f.quiet {
 		return
 	}
-	fmt.Fprintf(f.writer, "✓ %s\n", message)
+	_, _ = fmt.Fprintf(f.writer, "✓ %s\n", message)
 }
 
 // Error 打印错误消息
 func (f *Formatter) Error(message string) {
-	fmt.Fprintf(f.writer, "✗ %s\n", message)
+	_, _ = fmt.Fprintf(f.writer, "✗ %s\n", message)
 }
 
 // Warning 打印警告消息
@@ -86,7 +92,7 @@ func (f *Formatter) Warning(message string) {
 	if f.quiet {
 		return
 	}
-	fmt.Fprintf(f.writer, "⚠ %s\n", message)
+	_, _ = fmt.Fprintf(f.writer, "⚠ %s\n", message)
 }
 
 // Info 打印信息消息
@@ -94,7 +100,7 @@ func (f *Formatter) Info(message string) {
 	if f.quiet {
 		return
 	}
-	fmt.Fprintf(f.writer, "ℹ %s\n", message)
+	_, _ = fmt.Fprintf(f.writer, "ℹ %s\n", message)
 }
 
 // Output 输出结构化数据
@@ -125,7 +131,9 @@ func (f *Formatter) outputJSON(data interface{}) error {
 // outputYAML 输出 YAML 格式
 func (f *Formatter) outputYAML(data interface{}) error {
 	encoder := yaml.NewEncoder(f.writer)
-	defer encoder.Close()
+	defer func() {
+		_ = encoder.Close()
+	}()
 	return encoder.Encode(data)
 }
 
@@ -145,14 +153,16 @@ func (f *Formatter) outputTemplate(data interface{}) error {
 
 // outputText 输出纯文本格式
 func (f *Formatter) outputText(data interface{}) error {
-	fmt.Fprintln(f.writer, data)
+	_, _ = fmt.Fprintln(f.writer, data)
 	return nil
 }
 
 // outputTable 输出表格格式
 func (f *Formatter) outputTable(data interface{}) error {
 	w := tabwriter.NewWriter(f.writer, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		_ = w.Flush()
+	}()
 
 	// 尝试将数据转换为可迭代的格式
 	switch v := data.(type) {
@@ -181,17 +191,17 @@ func (f *Formatter) printTableFromSlice(w *tabwriter.Writer, data []interface{})
 	if firstItem, ok := data[0].(map[string]interface{}); ok {
 		// 打印表头
 		for key := range firstItem {
-			fmt.Fprintf(w, "%s\t", key)
+			_, _ = fmt.Fprintf(w, "%s\t", key)
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 
 		// 打印数据行
 		for _, item := range data {
 			if row, ok := item.(map[string]interface{}); ok {
 				for key := range firstItem {
-					fmt.Fprintf(w, "%v\t", row[key])
+					_, _ = fmt.Fprintf(w, "%v\t", row[key])
 				}
-				fmt.Fprintln(w)
+				_, _ = fmt.Fprintln(w)
 			}
 		}
 	}
@@ -201,9 +211,9 @@ func (f *Formatter) printTableFromSlice(w *tabwriter.Writer, data []interface{})
 
 // printTableFromMap 从 map 打印表格
 func (f *Formatter) printTableFromMap(w *tabwriter.Writer, data map[string]interface{}) error {
-	fmt.Fprintln(w, "KEY\tVALUE")
+	_, _ = fmt.Fprintln(w, "KEY\tVALUE")
 	for key, value := range data {
-		fmt.Fprintf(w, "%s\t%v\n", key, value)
+		_, _ = fmt.Fprintf(w, "%s\t%v\n", key, value)
 	}
 	return nil
 }
@@ -228,27 +238,27 @@ func (f *Formatter) PrintSummary(summary *Summary) error {
 	}
 
 	// 文本格式输出
-	fmt.Fprintln(f.writer, "\n===== Summary =====")
-	fmt.Fprintf(f.writer, "Total:    %d\n", summary.Total)
-	fmt.Fprintf(f.writer, "Success:  %d\n", summary.Success)
-	fmt.Fprintf(f.writer, "Failed:   %d\n", summary.Failed)
-	fmt.Fprintf(f.writer, "Skipped:  %d\n", summary.Skipped)
-	fmt.Fprintf(f.writer, "Duration: %s\n", summary.Duration)
+	_, _ = fmt.Fprintln(f.writer, "\n===== Summary =====")
+	_, _ = fmt.Fprintf(f.writer, "Total:    %d\n", summary.Total)
+	_, _ = fmt.Fprintf(f.writer, "Success:  %d\n", summary.Success)
+	_, _ = fmt.Fprintf(f.writer, "Failed:   %d\n", summary.Failed)
+	_, _ = fmt.Fprintf(f.writer, "Skipped:  %d\n", summary.Skipped)
+	_, _ = fmt.Fprintf(f.writer, "Duration: %s\n", summary.Duration)
 
 	if len(summary.Errors) > 0 {
-		fmt.Fprintln(f.writer, "\nErrors:")
+		_, _ = fmt.Fprintln(f.writer, "\nErrors:")
 		for _, err := range summary.Errors {
-			fmt.Fprintf(f.writer, "  - %s\n", err)
+			_, _ = fmt.Fprintf(f.writer, "  - %s\n", err)
 		}
 	}
 
 	if len(summary.Warnings) > 0 {
-		fmt.Fprintln(f.writer, "\nWarnings:")
+		_, _ = fmt.Fprintln(f.writer, "\nWarnings:")
 		for _, warn := range summary.Warnings {
-			fmt.Fprintf(f.writer, "  - %s\n", warn)
+			_, _ = fmt.Fprintf(f.writer, "  - %s\n", warn)
 		}
 	}
 
-	fmt.Fprintln(f.writer, "===================")
+	_, _ = fmt.Fprintln(f.writer, "===================")
 	return nil
 }

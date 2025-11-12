@@ -1,3 +1,4 @@
+// Package service provides business logic for applying Nexus configurations.
 package service
 
 import (
@@ -226,12 +227,12 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 
 		// 添加必需的代理设置（negativeCache 和 httpClient）
 		req.NegativeCache = &nexus.NegativeCacheSettings{
-			Enabled: true,
+			Enabled:    true,
 			TimeToLive: 1440,
 		}
 		req.HTTPClient = &nexus.HTTPClientSettings{
-			Blocked:    false,
-			AutoBlock:  true,
+			Blocked:   false,
+			AutoBlock: true,
 			Connection: &nexus.HTTPClientConnection{
 				RetryAttempts: 3,
 				Timeout:       60,

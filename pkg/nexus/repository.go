@@ -8,16 +8,16 @@ import (
 
 // RepositoryRequest 通用仓库请求结构
 type RepositoryRequest struct {
-	Name          string                  `json:"name"`
-	Online        bool                    `json:"online"`
-	Storage       map[string]interface{}  `json:"storage"`
-	Cleanup       *CleanupPolicy          `json:"cleanup,omitempty"`
-	Proxy         *ProxySettings          `json:"proxy,omitempty"`
-	NegativeCache *NegativeCacheSettings  `json:"negativeCache,omitempty"`
-	HTTPClient    *HTTPClientSettings     `json:"httpClient,omitempty"`
-	Maven         *MavenSettings          `json:"maven,omitempty"`
-	Docker        *DockerSettings         `json:"docker,omitempty"`
-	Apt           *AptSettings            `json:"apt,omitempty"`
+	Name          string                 `json:"name"`
+	Online        bool                   `json:"online"`
+	Storage       map[string]interface{} `json:"storage"`
+	Cleanup       *CleanupPolicy         `json:"cleanup,omitempty"`
+	Proxy         *ProxySettings         `json:"proxy,omitempty"`
+	NegativeCache *NegativeCacheSettings `json:"negativeCache,omitempty"`
+	HTTPClient    *HTTPClientSettings    `json:"httpClient,omitempty"`
+	Maven         *MavenSettings         `json:"maven,omitempty"`
+	Docker        *DockerSettings        `json:"docker,omitempty"`
+	Apt           *AptSettings           `json:"apt,omitempty"`
 }
 
 // CleanupPolicy 清理策略
@@ -50,9 +50,9 @@ type NegativeCacheSettings struct {
 
 // HTTPClientSettings HTTP客户端设置
 type HTTPClientSettings struct {
-	Blocked    bool                   `json:"blocked"`
-	AutoBlock  bool                   `json:"autoBlock"`
-	Connection *HTTPClientConnection  `json:"connection,omitempty"`
+	Blocked    bool                  `json:"blocked"`
+	AutoBlock  bool                  `json:"autoBlock"`
+	Connection *HTTPClientConnection `json:"connection,omitempty"`
 }
 
 // HTTPClientConnection HTTP客户端连接设置

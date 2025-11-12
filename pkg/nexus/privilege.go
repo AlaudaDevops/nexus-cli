@@ -1,3 +1,4 @@
+// Package nexus provides client for Sonatype Nexus Repository Manager API.
 package nexus
 
 import (

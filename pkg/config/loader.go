@@ -1,3 +1,4 @@
+// Package config provides configuration types and loading functionality.
 package config
 
 import (

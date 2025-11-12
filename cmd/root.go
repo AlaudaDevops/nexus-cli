@@ -1,3 +1,4 @@
+// Package cmd provides command-line interface for Nexus CLI.
 package cmd
 
 import (

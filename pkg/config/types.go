@@ -1,3 +1,4 @@
+// Package config provides configuration types and loading functionality.
 package config
 
 // Config 主配置结构

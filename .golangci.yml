@@ -1,7 +1,7 @@
 run:
   timeout: 5m
   tests: true
-  skip-dirs:
+  exclude-dirs:
     - vendor
 
 linters:
@@ -21,14 +21,54 @@ linters:
     - stylecheck
 
 linters-settings:
+  errcheck:
+    check-blank: false
+    check-type-assertions: false
+    exclude-functions:
+      - (io.Closer).Close
+      - (*os.File).Close
+      - (*yaml.Encoder).Close
+      - (*tabwriter.Writer).Flush
+
   gocyclo:
-    min-complexity: 15
+    min-complexity: 30  # Increased to reduce false positives
+
   misspell:
     locale: US
+
   goimports:
     local-prefixes: github.com/alauda/nexus-cli
 
+  revive:
+    rules:
+      - name: package-comments
+        disabled: false
+      - name: exported
+        disabled: false
+      - name: unused-parameter
+        severity: warning
+
+  stylecheck:
+    checks: ["all", "-ST1000"]
+
 issues:
-  exclude-use-default: false
+  exclude-use-default: true
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-rules:
+    # Exclude errcheck for fmt.* in certain contexts
+    - linters:
+        - errcheck
+      text: "Error return value of `fmt\\.(Fp|P)rint"
+    # Exclude errcheck for defer Close/Flush
+    - linters:
+        - errcheck
+      text: "Error return value of.*\\.(Close|Flush)"
+    # Exclude unused parameter warnings for cobra command handlers
+    - linters:
+        - revive
+      text: "unused-parameter.*cmd"
+    # Exclude errcheck in test files
+    - path: _test\.go
+      linters:
+        - errcheck

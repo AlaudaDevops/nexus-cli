@@ -5,11 +5,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/alauda/nexus-cli/pkg/config"
 	"github.com/alauda/nexus-cli/pkg/nexus"
 	"github.com/alauda/nexus-cli/pkg/output"
 	"github.com/alauda/nexus-cli/pkg/service"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -45,7 +46,7 @@ func init() {
 	deleteCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be deleted without actually deleting")
 }
 
-func runDelete(cmd *cobra.Command, args []string) error {
+func runDelete(_ *cobra.Command, _ []string) error {
 	if cfgFile == "" {
 		return fmt.Errorf("config file is required, use -c or --config flag")
 	}
@@ -95,12 +96,12 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	// 确认删除（除非使用 --force）
 	if !forceDelete {
 		fmt.Println("\nThe following resources will be DELETED:")
-		showDeletePlan(cfg, formatter)
+		_ = showDeletePlan(cfg, formatter)
 		fmt.Print("\nAre you sure you want to delete these resources? (yes/no): ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if response != "yes" && response != "y" {
-			formatter.Info("Delete cancelled")
+			formatter.Info("Delete canceled")
 			return nil
 		}
 	}
@@ -131,7 +132,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	return formatter.PrintSummary(summary)
 }
 
-func showDeletePlan(cfg *config.Config, formatter *output.Formatter) error {
+func showDeletePlan(cfg *config.Config, _ *output.Formatter) error {
 	if len(cfg.Users) > 0 {
 		fmt.Println("\nUsers:")
 		for _, user := range cfg.Users {

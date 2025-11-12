@@ -1,0 +1,55 @@
+# Pre-commit hooks configuration
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go-fmt
+        entry: gofmt
+        args: [-w, -s]
+        language: system
+        files: \.go$
+        pass_filenames: true
+
+      - id: go-imports
+        name: go-imports
+        entry: bash -c 'export PATH=$PATH:$(go env GOPATH)/bin && goimports -w "$@"' --
+        language: system
+        files: \.go$
+        pass_filenames: true
+
+      - id: go-vet
+        name: go-vet
+        entry: go vet
+        language: system
+        files: \.go$
+        pass_filenames: false
+        args: [./...]
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: bash -c 'golangci-lint run --fix'
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      - id: go-test
+        name: go-test
+        entry: go test
+        language: system
+        files: \.go$
+        pass_filenames: false
+        args: [-v, ./...]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: mixed-line-ending

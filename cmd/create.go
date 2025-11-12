@@ -1,3 +1,4 @@
+// Package cmd provides command-line interface for Nexus CLI.
 package cmd
 
 import (
@@ -9,12 +10,13 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+
 	"github.com/alauda/nexus-cli/pkg/config"
 	"github.com/alauda/nexus-cli/pkg/nexus"
 	"github.com/alauda/nexus-cli/pkg/output"
 	"github.com/alauda/nexus-cli/pkg/service"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -63,7 +65,7 @@ func init() {
 	createCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Quiet mode - only show errors")
 }
 
-func runCreate(cmd *cobra.Command, args []string) error {
+func runCreate(_ *cobra.Command, _ []string) error {
 	if cfgFile == "" {
 		return fmt.Errorf("config file is required, use -c or --config flag")
 	}
@@ -186,10 +188,10 @@ type OutputConfig struct {
 func outputResourcesDefault(client *nexus.Client, cfg *config.Config, outputFile string) error {
 	// 创建默认输出结构（与 config.Config 格式一致）
 	defaultOutput := struct {
-		Users        []*UserWithPassword              `yaml:"users,omitempty"`
-		Repositories []RepositoryOutput               `yaml:"repositories,omitempty"`
-		Roles        []*nexus.RoleResponse            `yaml:"roles,omitempty"`
-		Privileges   []*nexus.PrivilegeResponse       `yaml:"privileges,omitempty"`
+		Users        []*UserWithPassword               `yaml:"users,omitempty"`
+		Repositories []RepositoryOutput                `yaml:"repositories,omitempty"`
+		Roles        []*nexus.RoleResponse             `yaml:"roles,omitempty"`
+		Privileges   []*nexus.PrivilegeResponse        `yaml:"privileges,omitempty"`
 		Permissions  []config.UserRepositoryPermission `yaml:"userRepositoryPermissions,omitempty"`
 	}{}
 
