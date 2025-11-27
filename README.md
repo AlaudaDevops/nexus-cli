@@ -1,45 +1,47 @@
-# Nexus CLI 使用指南
+# Nexus CLI User Guide
 
-## 简介
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Nexus CLI 是一个命令行工具，用于自动化管理 Nexus Repository Manager。它允许你通过 YAML 配置文件批量创建和管理：
+## Introduction
 
-- 用户账户
-- 各种类型的仓库（Maven、Docker、NPM 等）
-- 角色和权限
-- 用户与仓库的权限映射
+Nexus CLI is a command-line tool for automating the management of Nexus Repository Manager. It allows you to batch create and manage the following through YAML configuration files:
 
-## 安装步骤
+- User accounts
+- Various types of repositories (Maven, Docker, NPM, etc.)
+- Roles and permissions
+- User-to-repository permission mappings
 
-### 方式一：从源码构建
+## Installation
+
+### Option 1: Build from Source
 
 ```bash
-# 1. 确保安装了 Go 1.21 或更高版本
+# 1. Ensure Go 1.21 or higher is installed
 go version
 
-# 2. 克隆项目
+# 2. Clone the project
 git clone https://github.com/alauda/nexus-cli.git
 cd nexus-cli
 
-# 3. 下载依赖
+# 3. Download dependencies
 go mod download
 
-# 4. 构建
+# 4. Build
 make build
 
-# 5. 验证安装
+# 5. Verify installation
 ./nexus-cli version
 ```
 
-### 方式二：直接安装
+### Option 2: Direct Installation
 
 ```bash
 go install github.com/alauda/nexus-cli@latest
 ```
 
-## 配置 Nexus 认证
+## Configure Nexus Authentication
 
-Nexus CLI 通过环境变量获取认证信息，不在配置文件中存储管理员密码。
+Nexus CLI obtains authentication information through environment variables and does not store admin passwords in configuration files.
 
 ```bash
 # Linux/macOS
@@ -48,16 +50,16 @@ export NEXUS_USERNAME=admin
 export NEXUS_PASSWORD=your-admin-password
 ```
 
-建议将这些环境变量添加到你的 shell 配置文件中（如 `.bashrc`, `.zshrc`）。
+It's recommended to add these environment variables to your shell configuration file (such as `.bashrc`, `.zshrc`).
 
-## 创建配置文件
+## Create Configuration File
 
-### 基础示例
+### Basic Example
 
-创建一个名为 `my-config.yaml` 的文件：
+Create a file named `my-config.yaml`:
 
 ```yaml
-# 创建一个开发者用户
+# Create a developer user
 users:
   - id: "dev-user"
     firstName: "Dev"
@@ -68,7 +70,7 @@ users:
     roles:
       - "nx-deploy"
 
-# 创建一个 Maven 仓库
+# Create a Maven repository
 repositories:
   - name: "company-maven"
     format: "maven2"
@@ -82,7 +84,7 @@ repositories:
       versionPolicy: "RELEASE"
       layoutPolicy: "STRICT"
 
-# 给用户分配仓库权限
+# Assign repository permissions to user
 userRepositoryPermissions:
   - userId: "dev-user"
     repository: "company-maven"
@@ -92,18 +94,18 @@ userRepositoryPermissions:
       - "ADD"
 ```
 
-### 完整示例
+### Complete Example
 
-参考 `config/example.yaml` 获取更多配置选项。
+Refer to `config/example.yaml` for more configuration options.
 
-## 应用配置
+## Apply Configuration
 
 ```bash
-# 应用配置文件
+# Apply configuration file
 nexus-cli apply -c my-config.yaml
 ```
 
-输出示例：
+Example output:
 
 ```
 2024/01/01 10:00:00 Connecting to Nexus at http://localhost:8081...
@@ -120,9 +122,9 @@ nexus-cli apply -c my-config.yaml
 2024/01/01 10:00:05 Configuration applied successfully!
 ```
 
-## 常见使用场景
+## Common Use Cases
 
-### 场景 1: 为新项目创建仓库和用户
+### Scenario 1: Create Repositories and Users for a New Project
 
 ```yaml
 users:
@@ -177,11 +179,11 @@ userRepositoryPermissions:
       - "ADD"
 ```
 
-### 场景 2: 配置代理仓库
+### Scenario 2: Configure Proxy Repositories
 
 ```yaml
 repositories:
-  # Maven 中央仓库代理
+  # Maven Central proxy
   - name: "maven-central-proxy"
     format: "maven2"
     type: "proxy"
@@ -197,7 +199,7 @@ repositories:
       versionPolicy: "RELEASE"
       layoutPolicy: "STRICT"
 
-  # NPM 仓库代理
+  # NPM registry proxy
   - name: "npmjs-proxy"
     format: "npm"
     type: "proxy"
@@ -210,7 +212,7 @@ repositories:
       contentMaxAge: 1440
       metadataMaxAge: 1440
 
-  # Docker Hub 代理
+  # Docker Hub proxy
   - name: "dockerhub-proxy"
     format: "docker"
     type: "proxy"
@@ -228,10 +230,10 @@ repositories:
       v1Enabled: false
 ```
 
-### 场景 3: 创建角色和权限体系
+### Scenario 3: Create Roles and Permission System
 
 ```yaml
-# 先定义权限
+# Define privileges first
 privileges:
   - name: "maven-read-only"
     description: "Read-only access to Maven repositories"
@@ -253,7 +255,7 @@ privileges:
       - "ADD"
       - "EDIT"
 
-# 创建角色
+# Create roles
 roles:
   - id: "developer-readonly"
     name: "Developer (Read-Only)"
@@ -267,7 +269,7 @@ roles:
     privileges:
       - "maven-deploy"
 
-# 分配给用户
+# Assign to users
 users:
   - id: "readonly-dev"
     firstName: "ReadOnly"
@@ -287,3 +289,7 @@ users:
     roles:
       - "developer-deploy"
 ```
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
