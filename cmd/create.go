@@ -23,6 +23,7 @@ var (
 	outputFormat   string
 	outputTemplate string
 	outputFile     string
+	resolvedConfig string
 	quiet          bool
 )
 
@@ -62,6 +63,7 @@ func init() {
 	createCmd.Flags().StringVarP(&outputFormat, "output", "o", "text", "Output format (text|json|yaml|template|table)")
 	createCmd.Flags().StringVar(&outputTemplate, "output-template", "", "Template file to format resource output")
 	createCmd.Flags().StringVar(&outputFile, "output-file", "", "File to write resource output (stdout if not specified)")
+	createCmd.Flags().StringVar(&resolvedConfig, "resolved-config", "", "File to write resolved config used by create/delete after nameMode processing")
 	createCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Quiet mode - only show errors")
 }
 
@@ -115,8 +117,23 @@ func runCreate(_ *cobra.Command, _ []string) error {
 
 	formatter.Info(fmt.Sprintf("Loaded configuration from %s", cfgFile))
 
+	// Resolve nameMode before applying resources.
+	resolvedCfg, suffix, err := cfg.ResolveNames()
+	if err != nil {
+		return fmt.Errorf("failed to resolve config names: %w", err)
+	}
+	if suffix != "" {
+		formatter.Info(fmt.Sprintf("Resolved nameMode=prefix with suffix: %s", suffix))
+	}
+	if resolvedConfig != "" {
+		if err := config.Save(resolvedConfig, resolvedCfg); err != nil {
+			return fmt.Errorf("failed to save resolved config: %w", err)
+		}
+		formatter.Info(fmt.Sprintf("Resolved config written to %s", resolvedConfig))
+	}
+
 	// 创建服务并执行
-	svc := service.NewApplyService(client, cfg, formatter)
+	svc := service.NewApplyService(client, resolvedCfg, formatter)
 	result, err := svc.Apply()
 	if err != nil {
 		return fmt.Errorf("failed to create resources: %w", err)
@@ -146,9 +163,9 @@ func runCreate(_ *cobra.Command, _ []string) error {
 	if outputTemplate != "" || outputFile != "" {
 		// 如果没有指定模板，使用默认的 YAML 格式输出（与配置文件格式一致）
 		if outputTemplate == "" {
-			return outputResourcesDefault(client, cfg, outputFile)
+			return outputResourcesDefault(client, resolvedCfg, outputFile)
 		}
-		return outputResources(client, cfg, outputTemplate, outputFile)
+		return outputResources(client, resolvedCfg, outputTemplate, outputFile)
 	}
 
 	return nil

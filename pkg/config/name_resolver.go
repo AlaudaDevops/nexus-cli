@@ -1,0 +1,288 @@
+// Package config provides configuration types and loading functionality.
+package config
+
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+const (
+	// NameModeName keeps the configured resource names unchanged.
+	NameModeName = "name"
+	// NameModePrefix appends a timestamp suffix to configured resource names.
+	NameModePrefix = "prefix"
+)
+
+// ResolveNames resolves nameMode for all supported resources and rewrites references.
+// It returns the resolved configuration and the generated suffix.
+// The returned suffix is empty when no prefix mode is applied.
+func (c *Config) ResolveNames() (*Config, string, error) {
+	suffix := GenerateTimestampSuffix()
+	resolved, applied, err := c.resolveNamesWithSuffix(suffix)
+	if err != nil {
+		return nil, "", err
+	}
+	if !applied {
+		return resolved, "", nil
+	}
+	return resolved, suffix, nil
+}
+
+// ResolveNamesWithSuffix resolves nameMode with a caller-provided suffix.
+// This helper is mainly intended for deterministic tests.
+func (c *Config) ResolveNamesWithSuffix(suffix string) (*Config, error) {
+	resolved, _, err := c.resolveNamesWithSuffix(suffix)
+	if err != nil {
+		return nil, err
+	}
+	return resolved, nil
+}
+
+// GenerateTimestampSuffix returns timestamp in the same format used by gitlab-cli.
+func GenerateTimestampSuffix() string {
+	return time.Now().Format("20060102150405")
+}
+
+// resolveNamesWithSuffix performs a full nameMode resolution and returns whether prefix mode was applied.
+func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
+	if c == nil {
+		return &Config{}, false, nil
+	}
+
+	defaultMode, err := normalizeNameMode(c.NameMode, NameModeName)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid config.nameMode: %w", err)
+	}
+
+	resolved := cloneConfig(c)
+	appliedPrefix := false
+
+	userIDMap := make(map[string]string, len(resolved.Users))
+	repositoryNameMap := make(map[string]string, len(resolved.Repositories))
+	roleIDMap := make(map[string]string, len(resolved.Roles))
+	privilegeNameMap := make(map[string]string, len(resolved.Privileges))
+
+	for i, user := range resolved.Users {
+		mode, err := normalizeNameMode(user.NameMode, defaultMode)
+		if err != nil {
+			return nil, false, fmt.Errorf("invalid users[%d].nameMode: %w", i, err)
+		}
+
+		actualID := user.ID
+		if mode == NameModePrefix {
+			if suffix == "" {
+				return nil, false, fmt.Errorf("nameMode prefix requires a non-empty suffix")
+			}
+			appliedPrefix = true
+			actualID = withSuffix(user.ID, suffix)
+			resolved.Users[i].ID = actualID
+			resolved.Users[i].EmailAddress = emailWithSuffix(user.EmailAddress, suffix)
+		}
+		userIDMap[user.ID] = actualID
+	}
+
+	for i, repository := range resolved.Repositories {
+		mode, err := normalizeNameMode(repository.NameMode, defaultMode)
+		if err != nil {
+			return nil, false, fmt.Errorf("invalid repositories[%d].nameMode: %w", i, err)
+		}
+
+		actualName := repository.Name
+		if mode == NameModePrefix {
+			if suffix == "" {
+				return nil, false, fmt.Errorf("nameMode prefix requires a non-empty suffix")
+			}
+			appliedPrefix = true
+			actualName = withSuffix(repository.Name, suffix)
+			resolved.Repositories[i].Name = actualName
+		}
+		repositoryNameMap[repository.Name] = actualName
+	}
+
+	for i, privilege := range resolved.Privileges {
+		mode, err := normalizeNameMode(privilege.NameMode, defaultMode)
+		if err != nil {
+			return nil, false, fmt.Errorf("invalid privileges[%d].nameMode: %w", i, err)
+		}
+
+		actualName := privilege.Name
+		if mode == NameModePrefix {
+			if suffix == "" {
+				return nil, false, fmt.Errorf("nameMode prefix requires a non-empty suffix")
+			}
+			appliedPrefix = true
+			actualName = withSuffix(privilege.Name, suffix)
+			resolved.Privileges[i].Name = actualName
+		}
+		privilegeNameMap[privilege.Name] = actualName
+	}
+
+	for i, role := range resolved.Roles {
+		mode, err := normalizeNameMode(role.NameMode, defaultMode)
+		if err != nil {
+			return nil, false, fmt.Errorf("invalid roles[%d].nameMode: %w", i, err)
+		}
+
+		actualID := role.ID
+		if mode == NameModePrefix {
+			if suffix == "" {
+				return nil, false, fmt.Errorf("nameMode prefix requires a non-empty suffix")
+			}
+			appliedPrefix = true
+			actualID = withSuffix(role.ID, suffix)
+			resolved.Roles[i].ID = actualID
+			resolved.Roles[i].Name = withSuffix(role.Name, suffix)
+		}
+		roleIDMap[role.ID] = actualID
+	}
+
+	for i := range resolved.Users {
+		resolved.Users[i].Roles = remapStrings(resolved.Users[i].Roles, roleIDMap)
+	}
+
+	for i := range resolved.Roles {
+		resolved.Roles[i].Privileges = remapStrings(resolved.Roles[i].Privileges, privilegeNameMap)
+		resolved.Roles[i].Roles = remapStrings(resolved.Roles[i].Roles, roleIDMap)
+	}
+
+	for i := range resolved.Privileges {
+		if mappedRepo, ok := repositoryNameMap[resolved.Privileges[i].Repository]; ok {
+			resolved.Privileges[i].Repository = mappedRepo
+		}
+	}
+
+	for i := range resolved.UserRepositoryPermissions {
+		if mappedUser, ok := userIDMap[resolved.UserRepositoryPermissions[i].UserID]; ok {
+			resolved.UserRepositoryPermissions[i].UserID = mappedUser
+		}
+		if mappedRepo, ok := repositoryNameMap[resolved.UserRepositoryPermissions[i].Repository]; ok {
+			resolved.UserRepositoryPermissions[i].Repository = mappedRepo
+		}
+	}
+
+	return resolved, appliedPrefix, nil
+}
+
+// normalizeNameMode validates and normalizes a nameMode value.
+func normalizeNameMode(mode string, fallback string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(mode))
+	if normalized == "" {
+		normalized = fallback
+	}
+	switch normalized {
+	case NameModeName, NameModePrefix:
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("unsupported nameMode %q (allowed: %q, %q)", mode, NameModeName, NameModePrefix)
+	}
+}
+
+// withSuffix appends suffix in "<value>-<suffix>" format.
+func withSuffix(value string, suffix string) string {
+	if value == "" || suffix == "" {
+		return value
+	}
+	return fmt.Sprintf("%s-%s", value, suffix)
+}
+
+// emailWithSuffix appends suffix to email local-part to avoid collisions.
+func emailWithSuffix(email string, suffix string) string {
+	if email == "" || suffix == "" {
+		return email
+	}
+	at := strings.Index(email, "@")
+	if at < 0 {
+		return withSuffix(email, suffix)
+	}
+	return fmt.Sprintf("%s+%s%s", email[:at], suffix, email[at:])
+}
+
+// remapStrings remaps values using map and keeps unknown values unchanged.
+func remapStrings(values []string, mapping map[string]string) []string {
+	if len(values) == 0 {
+		return values
+	}
+	remapped := make([]string, 0, len(values))
+	for _, value := range values {
+		if mapped, ok := mapping[value]; ok {
+			remapped = append(remapped, mapped)
+			continue
+		}
+		remapped = append(remapped, value)
+	}
+	return remapped
+}
+
+// cloneConfig creates a deep copy for all mutable slices.
+func cloneConfig(in *Config) *Config {
+	if in == nil {
+		return &Config{}
+	}
+
+	out := &Config{
+		NameMode:                  in.NameMode,
+		Users:                     make([]User, len(in.Users)),
+		Repositories:              make([]Repository, len(in.Repositories)),
+		Privileges:                make([]Privilege, len(in.Privileges)),
+		Roles:                     make([]Role, len(in.Roles)),
+		UserRepositoryPermissions: make([]UserRepositoryPermission, len(in.UserRepositoryPermissions)),
+	}
+
+	for i, user := range in.Users {
+		out.Users[i] = user
+		out.Users[i].Roles = copyStrings(user.Roles)
+	}
+	for i, repository := range in.Repositories {
+		out.Repositories[i] = repository
+		if repository.Proxy != nil {
+			proxyCopy := *repository.Proxy
+			if repository.Proxy.Authentication != nil {
+				authCopy := *repository.Proxy.Authentication
+				proxyCopy.Authentication = &authCopy
+			}
+			out.Repositories[i].Proxy = &proxyCopy
+		}
+		if repository.Maven != nil {
+			mavenCopy := *repository.Maven
+			out.Repositories[i].Maven = &mavenCopy
+		}
+		if repository.Docker != nil {
+			dockerCopy := *repository.Docker
+			out.Repositories[i].Docker = &dockerCopy
+		}
+		if repository.Apt != nil {
+			aptCopy := *repository.Apt
+			out.Repositories[i].Apt = &aptCopy
+		}
+		if repository.Cleanup != nil {
+			cleanupCopy := *repository.Cleanup
+			cleanupCopy.PolicyNames = copyStrings(repository.Cleanup.PolicyNames)
+			out.Repositories[i].Cleanup = &cleanupCopy
+		}
+	}
+	for i, privilege := range in.Privileges {
+		out.Privileges[i] = privilege
+		out.Privileges[i].Actions = copyStrings(privilege.Actions)
+	}
+	for i, role := range in.Roles {
+		out.Roles[i] = role
+		out.Roles[i].Privileges = copyStrings(role.Privileges)
+		out.Roles[i].Roles = copyStrings(role.Roles)
+	}
+	for i, permission := range in.UserRepositoryPermissions {
+		out.UserRepositoryPermissions[i] = permission
+		out.UserRepositoryPermissions[i].Privileges = copyStrings(permission.Privileges)
+	}
+	return out
+}
+
+// copyStrings clones a string slice.
+func copyStrings(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, len(in))
+	copy(out, in)
+	return out
+}
