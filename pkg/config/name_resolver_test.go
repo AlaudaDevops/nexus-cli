@@ -7,11 +7,12 @@ import (
 	"testing"
 )
 
-func TestResolveNamesWithSuffixPrefixMode(t *testing.T) {
+// TestResolveNamesWithSuffixSuffixMode verifies suffix mode rewrites all managed names and references.
+func TestResolveNamesWithSuffixSuffixMode(t *testing.T) {
 	const suffix = "20260324112233"
 
 	cfg := &Config{
-		NameMode: "prefix",
+		NameMode: "suffix",
 		Users: []User{
 			{
 				ID:           "repo-admin",
@@ -171,7 +172,7 @@ func TestResolveNamesWithSuffixResourceOverride(t *testing.T) {
 			{ID: "repository-manager", Name: "Repository Manager"},
 		},
 		Repositories: []Repository{
-			{NameMode: "prefix", Name: "maven-releases"},
+			{NameMode: "suffix", Name: "maven-releases"},
 		},
 		UserRepositoryPermissions: []UserRepositoryPermission{
 			{UserID: "repo-admin", Repository: "maven-releases"},
@@ -201,9 +202,38 @@ func TestResolveNamesInvalidMode(t *testing.T) {
 	}
 }
 
+// TestResolveNamesWithSuffixRequiresNonEmptySuffix verifies suffix mode rejects an empty suffix.
+func TestResolveNamesWithSuffixRequiresNonEmptySuffix(t *testing.T) {
+	cfg := &Config{
+		NameMode: "suffix",
+		Users: []User{
+			{ID: "repo-admin"},
+		},
+	}
+
+	_, err := cfg.ResolveNamesWithSuffix("")
+	if err == nil {
+		t.Fatal("ResolveNamesWithSuffix() expected error for empty suffix, got nil")
+	}
+	if !strings.Contains(err.Error(), "nameMode suffix requires a non-empty suffix") {
+		t.Fatalf("ResolveNamesWithSuffix() error = %v, want contains %q", err, "nameMode suffix requires a non-empty suffix")
+	}
+}
+
+// TestEmailWithSuffixWithoutAt verifies local fallback when email text has no '@'.
+func TestEmailWithSuffixWithoutAt(t *testing.T) {
+	const suffix = "20260324112233"
+
+	got := emailWithSuffix("repo-admin", suffix)
+	want := "repo-admin-" + suffix
+	if got != want {
+		t.Fatalf("emailWithSuffix() = %q, want %q", got, want)
+	}
+}
+
 func TestResolveNamesGenerateSuffix(t *testing.T) {
 	cfg := &Config{
-		NameMode: "prefix",
+		NameMode: "suffix",
 		Users: []User{
 			{ID: "repo-admin"},
 		},
@@ -214,7 +244,7 @@ func TestResolveNamesGenerateSuffix(t *testing.T) {
 		t.Fatalf("ResolveNames() error = %v", err)
 	}
 	if suffix == "" {
-		t.Fatal("ResolveNames() suffix should not be empty in prefix mode")
+		t.Fatal("ResolveNames() suffix should not be empty in suffix mode")
 	}
 
 	matched, err := regexp.MatchString(`^[0-9]{14}$`, suffix)
@@ -229,27 +259,119 @@ func TestResolveNamesGenerateSuffix(t *testing.T) {
 	}
 }
 
+// TestCloneConfigDeepCopyMutableNestedFields ensures cloneConfig does not share mutable nested state.
+func TestCloneConfigDeepCopyMutableNestedFields(t *testing.T) {
+	cfg := &Config{
+		Users: []User{
+			{ID: "repo-admin", Roles: []string{"repository-manager"}},
+		},
+		Repositories: []Repository{
+			{
+				Name: "maven-releases",
+				Proxy: &ProxyConfig{
+					RemoteURL: "https://example.com",
+					Authentication: &AuthConfig{
+						Type:     "username",
+						Username: "proxy-user",
+						Password: "proxy-pass",
+					},
+				},
+				Maven: &MavenConfig{
+					VersionPolicy: "RELEASE",
+					LayoutPolicy:  "STRICT",
+				},
+				Docker: &DockerConfig{
+					HTTPPort:       18080,
+					ForceBasicAuth: true,
+				},
+				Apt: &AptConfig{
+					Distribution: "stable",
+				},
+				Cleanup: &CleanupConfig{
+					PolicyNames: []string{"cleanup-old"},
+				},
+			},
+		},
+		Privileges: []Privilege{
+			{Name: "maven-deploy", Actions: []string{"READ"}},
+		},
+		Roles: []Role{
+			{ID: "repository-manager", Privileges: []string{"maven-deploy"}, Roles: []string{"nx-admin"}},
+		},
+		UserRepositoryPermissions: []UserRepositoryPermission{
+			{UserID: "repo-admin", Repository: "maven-releases", Privileges: []string{"READ"}},
+		},
+	}
+
+	cloned := cloneConfig(cfg)
+	cloned.Users[0].Roles[0] = "changed-role"
+	cloned.Repositories[0].Proxy.RemoteURL = "https://changed.example.com"
+	cloned.Repositories[0].Proxy.Authentication.Username = "changed-proxy-user"
+	cloned.Repositories[0].Maven.VersionPolicy = "MIXED"
+	cloned.Repositories[0].Docker.HTTPPort = 28080
+	cloned.Repositories[0].Apt.Distribution = "testing"
+	cloned.Repositories[0].Cleanup.PolicyNames[0] = "changed-policy"
+	cloned.Privileges[0].Actions[0] = "EDIT"
+	cloned.Roles[0].Privileges[0] = "changed-privilege"
+	cloned.Roles[0].Roles[0] = "changed-parent-role"
+	cloned.UserRepositoryPermissions[0].Privileges[0] = "BROWSE"
+
+	if cfg.Users[0].Roles[0] != "repository-manager" {
+		t.Fatalf("source users roles mutated: got %q", cfg.Users[0].Roles[0])
+	}
+	if cfg.Repositories[0].Proxy.RemoteURL != "https://example.com" {
+		t.Fatalf("source repository proxy remoteUrl mutated: got %q", cfg.Repositories[0].Proxy.RemoteURL)
+	}
+	if cfg.Repositories[0].Proxy.Authentication.Username != "proxy-user" {
+		t.Fatalf("source repository proxy auth username mutated: got %q", cfg.Repositories[0].Proxy.Authentication.Username)
+	}
+	if cfg.Repositories[0].Maven.VersionPolicy != "RELEASE" {
+		t.Fatalf("source repository maven versionPolicy mutated: got %q", cfg.Repositories[0].Maven.VersionPolicy)
+	}
+	if cfg.Repositories[0].Docker.HTTPPort != 18080 {
+		t.Fatalf("source repository docker httpPort mutated: got %d", cfg.Repositories[0].Docker.HTTPPort)
+	}
+	if cfg.Repositories[0].Apt.Distribution != "stable" {
+		t.Fatalf("source repository apt distribution mutated: got %q", cfg.Repositories[0].Apt.Distribution)
+	}
+	if cfg.Repositories[0].Cleanup.PolicyNames[0] != "cleanup-old" {
+		t.Fatalf("source repository cleanup policyNames mutated: got %q", cfg.Repositories[0].Cleanup.PolicyNames[0])
+	}
+	if cfg.Privileges[0].Actions[0] != "READ" {
+		t.Fatalf("source privilege actions mutated: got %q", cfg.Privileges[0].Actions[0])
+	}
+	if cfg.Roles[0].Privileges[0] != "maven-deploy" {
+		t.Fatalf("source role privileges mutated: got %q", cfg.Roles[0].Privileges[0])
+	}
+	if cfg.Roles[0].Roles[0] != "nx-admin" {
+		t.Fatalf("source role parent roles mutated: got %q", cfg.Roles[0].Roles[0])
+	}
+	if cfg.UserRepositoryPermissions[0].Privileges[0] != "READ" {
+		t.Fatalf("source user repository permissions mutated: got %q", cfg.UserRepositoryPermissions[0].Privileges[0])
+	}
+}
+
 // TestResolveNamesWithSuffixClearsNameModesForReuse ensures resolved config is idempotent for repeated create runs.
 func TestResolveNamesWithSuffixClearsNameModesForReuse(t *testing.T) {
 	const firstSuffix = "20260324112233"
 	const secondSuffix = "20260324113344"
 
 	cfg := &Config{
-		NameMode: "prefix",
+		NameMode: "suffix",
 		Users: []User{
 			{
-				NameMode:     "prefix",
+				NameMode:     "suffix",
 				ID:           "repo-admin",
 				EmailAddress: "repo-admin@example.com",
 				Roles:        []string{"repository-manager"},
 			},
 		},
 		Repositories: []Repository{
-			{NameMode: "prefix", Name: "maven-releases"},
+			{NameMode: "suffix", Name: "maven-releases"},
 		},
 		Privileges: []Privilege{
 			{
-				NameMode:   "prefix",
+				NameMode:   "suffix",
 				Name:       "maven-deploy",
 				Repository: "maven-releases",
 				Actions:    []string{"READ"},
@@ -257,7 +379,7 @@ func TestResolveNamesWithSuffixClearsNameModesForReuse(t *testing.T) {
 		},
 		Roles: []Role{
 			{
-				NameMode:    "prefix",
+				NameMode:    "suffix",
 				ID:          "repository-manager",
 				Name:        "Repository Manager",
 				Privileges:  []string{"maven-deploy"},

@@ -10,13 +10,13 @@ import (
 const (
 	// NameModeName keeps the configured resource names unchanged.
 	NameModeName = "name"
-	// NameModePrefix appends a timestamp suffix to configured resource names.
-	NameModePrefix = "prefix"
+	// NameModeSuffix appends a generated timestamp suffix to configured resource names.
+	NameModeSuffix = "suffix"
 )
 
 // ResolveNames resolves nameMode for all supported resources and rewrites references.
 // It returns the resolved configuration and the generated suffix.
-// The returned suffix is empty when no prefix mode is applied.
+// The returned suffix is empty when no suffix mode is applied.
 func (c *Config) ResolveNames() (*Config, string, error) {
 	suffix := GenerateTimestampSuffix()
 	resolved, applied, err := c.resolveNamesWithSuffix(suffix)
@@ -44,7 +44,7 @@ func GenerateTimestampSuffix() string {
 	return time.Now().Format("20060102150405")
 }
 
-// resolveNamesWithSuffix performs a full nameMode resolution and returns whether prefix mode was applied.
+// resolveNamesWithSuffix performs a full nameMode resolution and returns whether suffix mode was applied.
 func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 	if c == nil {
 		return &Config{}, false, nil
@@ -54,9 +54,13 @@ func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid config.nameMode: %w", err)
 	}
+	// Prevalidate suffix once to avoid repeated checks in every resource loop.
+	if defaultMode == NameModeSuffix && suffix == "" {
+		return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+	}
 
 	resolved := cloneConfig(c)
-	appliedPrefix := false
+	appliedSuffix := false
 
 	userIDMap := make(map[string]string, len(resolved.Users))
 	repositoryNameMap := make(map[string]string, len(resolved.Repositories))
@@ -68,13 +72,13 @@ func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 		if err != nil {
 			return nil, false, fmt.Errorf("invalid users[%d].nameMode: %w", i, err)
 		}
+		if mode == NameModeSuffix && suffix == "" {
+			return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+		}
 
 		actualID := user.ID
-		if mode == NameModePrefix {
-			if suffix == "" {
-				return nil, false, fmt.Errorf("nameMode prefix requires a non-empty suffix")
-			}
-			appliedPrefix = true
+		if mode == NameModeSuffix {
+			appliedSuffix = true
 			actualID = withSuffix(user.ID, suffix)
 			resolved.Users[i].ID = actualID
 			resolved.Users[i].EmailAddress = emailWithSuffix(user.EmailAddress, suffix)
@@ -87,13 +91,13 @@ func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 		if err != nil {
 			return nil, false, fmt.Errorf("invalid repositories[%d].nameMode: %w", i, err)
 		}
+		if mode == NameModeSuffix && suffix == "" {
+			return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+		}
 
 		actualName := repository.Name
-		if mode == NameModePrefix {
-			if suffix == "" {
-				return nil, false, fmt.Errorf("nameMode prefix requires a non-empty suffix")
-			}
-			appliedPrefix = true
+		if mode == NameModeSuffix {
+			appliedSuffix = true
 			actualName = withSuffix(repository.Name, suffix)
 			resolved.Repositories[i].Name = actualName
 		}
@@ -105,13 +109,13 @@ func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 		if err != nil {
 			return nil, false, fmt.Errorf("invalid privileges[%d].nameMode: %w", i, err)
 		}
+		if mode == NameModeSuffix && suffix == "" {
+			return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+		}
 
 		actualName := privilege.Name
-		if mode == NameModePrefix {
-			if suffix == "" {
-				return nil, false, fmt.Errorf("nameMode prefix requires a non-empty suffix")
-			}
-			appliedPrefix = true
+		if mode == NameModeSuffix {
+			appliedSuffix = true
 			actualName = withSuffix(privilege.Name, suffix)
 			resolved.Privileges[i].Name = actualName
 		}
@@ -123,13 +127,13 @@ func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 		if err != nil {
 			return nil, false, fmt.Errorf("invalid roles[%d].nameMode: %w", i, err)
 		}
+		if mode == NameModeSuffix && suffix == "" {
+			return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+		}
 
 		actualID := role.ID
-		if mode == NameModePrefix {
-			if suffix == "" {
-				return nil, false, fmt.Errorf("nameMode prefix requires a non-empty suffix")
-			}
-			appliedPrefix = true
+		if mode == NameModeSuffix {
+			appliedSuffix = true
 			actualID = withSuffix(role.ID, suffix)
 			resolved.Roles[i].ID = actualID
 			resolved.Roles[i].Name = withSuffix(role.Name, suffix)
@@ -163,7 +167,7 @@ func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 
 	clearNameModes(resolved)
 
-	return resolved, appliedPrefix, nil
+	return resolved, appliedSuffix, nil
 }
 
 // normalizeNameMode validates and normalizes a nameMode value.
@@ -173,10 +177,10 @@ func normalizeNameMode(mode string, fallback string) (string, error) {
 		normalized = fallback
 	}
 	switch normalized {
-	case NameModeName, NameModePrefix:
+	case NameModeName, NameModeSuffix:
 		return normalized, nil
 	default:
-		return "", fmt.Errorf("unsupported nameMode %q (allowed: %q, %q)", mode, NameModeName, NameModePrefix)
+		return "", fmt.Errorf("unsupported nameMode %q (allowed: %q, %q)", mode, NameModeName, NameModeSuffix)
 	}
 }
 

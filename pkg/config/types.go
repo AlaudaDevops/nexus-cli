@@ -4,7 +4,7 @@ package config
 // Config 主配置结构
 type Config struct {
 	// NameMode controls default naming behavior for all resources.
-	// "name" keeps names unchanged; "prefix" appends a generated timestamp suffix.
+	// "name" keeps names unchanged; "suffix" appends a generated timestamp suffix.
 	NameMode                  string                     `yaml:"nameMode,omitempty"`
 	Users                     []User                     `yaml:"users"`
 	Repositories              []Repository               `yaml:"repositories"`

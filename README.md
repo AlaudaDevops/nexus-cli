@@ -98,6 +98,42 @@ userRepositoryPermissions:
 
 Refer to `config/example.yaml` for more configuration options.
 
+### NameMode (Optional)
+
+`nameMode` controls how resource identifiers are generated before resources are created:
+
+- `name`: keep configured values unchanged (default behavior)
+- `suffix`: append an auto-generated timestamp suffix (format: `YYYYMMDDHHMMSS`)
+
+You can set `nameMode` globally and override it per resource:
+
+```yaml
+nameMode: "suffix"
+
+users:
+  - id: "repo-admin"
+    emailAddress: "repo-admin@example.com"
+    roles:
+      - "repository-manager"
+
+repositories:
+  - nameMode: "name" # override global suffix mode for this repository
+    name: "maven-releases"
+    format: "maven2"
+    type: "hosted"
+    online: true
+    storage:
+      blobStoreName: "default"
+      strictContentTypeValidation: true
+```
+
+To reuse the same resolved names in later cleanup workflows, persist the resolved config:
+
+```bash
+nexus-cli create -c my-config.yaml --resolved-config resolved-config.yaml
+nexus-cli delete -c resolved-config.yaml
+```
+
 ## Apply Configuration
 
 ```bash
