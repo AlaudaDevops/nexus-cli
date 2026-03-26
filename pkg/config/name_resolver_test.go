@@ -135,6 +135,30 @@ func TestResolveNamesWithSuffixNoChangeByDefault(t *testing.T) {
 	}
 }
 
+// TestResolveNamesWithSuffixPreservesExplicitEmptyUserRoles ensures explicit empty roles keep [] instead of nil.
+func TestResolveNamesWithSuffixPreservesExplicitEmptyUserRoles(t *testing.T) {
+	cfg := &Config{
+		Users: []User{
+			{ID: "repo-admin", Roles: []string{}},
+		},
+	}
+
+	resolved, err := cfg.ResolveNamesWithSuffix("20260324112233")
+	if err != nil {
+		t.Fatalf("ResolveNamesWithSuffix() error = %v", err)
+	}
+
+	if resolved.Users[0].Roles == nil {
+		t.Fatal("resolved users[0].roles = nil, want explicit empty slice")
+	}
+	if len(resolved.Users[0].Roles) != 0 {
+		t.Fatalf("resolved users[0].roles length = %d, want 0", len(resolved.Users[0].Roles))
+	}
+	if cfg.Users[0].Roles == nil {
+		t.Fatal("source users[0].roles = nil, want explicit empty slice")
+	}
+}
+
 func TestResolveNamesWithSuffixResourceOverride(t *testing.T) {
 	const suffix = "20260324112233"
 

@@ -302,7 +302,7 @@ func cloneConfig(in *Config) *Config {
 
 // copyStrings clones a string slice.
 func copyStrings(in []string) []string {
-	if len(in) == 0 {
+	if in == nil {
 		return nil
 	}
 	out := make([]string, len(in))
