@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -201,5 +202,80 @@ func TestResolveNamesGenerateSuffix(t *testing.T) {
 	}
 	if !strings.HasSuffix(resolved.Users[0].ID, "-"+suffix) {
 		t.Fatalf("resolved user id = %q should end with -%s", resolved.Users[0].ID, suffix)
+	}
+}
+
+// TestResolveNamesWithSuffixClearsNameModesForReuse ensures resolved config is idempotent for repeated create runs.
+func TestResolveNamesWithSuffixClearsNameModesForReuse(t *testing.T) {
+	const firstSuffix = "20260324112233"
+	const secondSuffix = "20260324113344"
+
+	cfg := &Config{
+		NameMode: "prefix",
+		Users: []User{
+			{
+				NameMode:     "prefix",
+				ID:           "repo-admin",
+				EmailAddress: "repo-admin@example.com",
+				Roles:        []string{"repository-manager"},
+			},
+		},
+		Repositories: []Repository{
+			{NameMode: "prefix", Name: "maven-releases"},
+		},
+		Privileges: []Privilege{
+			{
+				NameMode:   "prefix",
+				Name:       "maven-deploy",
+				Repository: "maven-releases",
+				Actions:    []string{"READ"},
+			},
+		},
+		Roles: []Role{
+			{
+				NameMode:    "prefix",
+				ID:          "repository-manager",
+				Name:        "Repository Manager",
+				Privileges:  []string{"maven-deploy"},
+				Description: "Role used by repository admins",
+			},
+		},
+		UserRepositoryPermissions: []UserRepositoryPermission{
+			{
+				UserID:     "repo-admin",
+				Repository: "maven-releases",
+				Privileges: []string{"READ"},
+			},
+		},
+	}
+
+	resolved, err := cfg.ResolveNamesWithSuffix(firstSuffix)
+	if err != nil {
+		t.Fatalf("ResolveNamesWithSuffix() first run error = %v", err)
+	}
+
+	if resolved.NameMode != "" {
+		t.Fatalf("resolved config nameMode = %q, want empty", resolved.NameMode)
+	}
+	if resolved.Users[0].NameMode != "" {
+		t.Fatalf("resolved users[0].nameMode = %q, want empty", resolved.Users[0].NameMode)
+	}
+	if resolved.Repositories[0].NameMode != "" {
+		t.Fatalf("resolved repositories[0].nameMode = %q, want empty", resolved.Repositories[0].NameMode)
+	}
+	if resolved.Privileges[0].NameMode != "" {
+		t.Fatalf("resolved privileges[0].nameMode = %q, want empty", resolved.Privileges[0].NameMode)
+	}
+	if resolved.Roles[0].NameMode != "" {
+		t.Fatalf("resolved roles[0].nameMode = %q, want empty", resolved.Roles[0].NameMode)
+	}
+
+	rerun, err := resolved.ResolveNamesWithSuffix(secondSuffix)
+	if err != nil {
+		t.Fatalf("ResolveNamesWithSuffix() second run error = %v", err)
+	}
+
+	if !reflect.DeepEqual(rerun, resolved) {
+		t.Fatalf("resolved config should be reusable without additional suffixing.\nfirst=%+v\nsecond=%+v", resolved, rerun)
 	}
 }

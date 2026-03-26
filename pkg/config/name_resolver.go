@@ -161,6 +161,8 @@ func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 		}
 	}
 
+	clearNameModes(resolved)
+
 	return resolved, appliedPrefix, nil
 }
 
@@ -212,6 +214,27 @@ func remapStrings(values []string, mapping map[string]string) []string {
 		remapped = append(remapped, value)
 	}
 	return remapped
+}
+
+// clearNameModes removes nameMode fields from a resolved config so it can be safely reused.
+func clearNameModes(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+
+	cfg.NameMode = ""
+	for i := range cfg.Users {
+		cfg.Users[i].NameMode = ""
+	}
+	for i := range cfg.Repositories {
+		cfg.Repositories[i].NameMode = ""
+	}
+	for i := range cfg.Privileges {
+		cfg.Privileges[i].NameMode = ""
+	}
+	for i := range cfg.Roles {
+		cfg.Roles[i].NameMode = ""
+	}
 }
 
 // cloneConfig creates a deep copy for all mutable slices.
