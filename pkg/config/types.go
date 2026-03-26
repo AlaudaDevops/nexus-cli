@@ -3,6 +3,9 @@ package config
 
 // Config 主配置结构
 type Config struct {
+	// NameMode controls default naming behavior for all resources.
+	// "name" keeps names unchanged; "suffix" appends a generated timestamp suffix.
+	NameMode                  string                     `yaml:"nameMode,omitempty"`
 	Users                     []User                     `yaml:"users"`
 	Repositories              []Repository               `yaml:"repositories"`
 	Privileges                []Privilege                `yaml:"privileges"`
@@ -12,6 +15,8 @@ type Config struct {
 
 // User 用户配置
 type User struct {
+	// NameMode overrides Config.NameMode for this user.
+	NameMode     string   `yaml:"nameMode,omitempty"`
 	ID           string   `yaml:"id"`
 	FirstName    string   `yaml:"firstName"`
 	LastName     string   `yaml:"lastName"`
@@ -23,16 +28,18 @@ type User struct {
 
 // Repository 仓库配置
 type Repository struct {
-	Name    string         `yaml:"name"`
-	Format  string         `yaml:"format"`
-	Type    string         `yaml:"type"`
-	Online  bool           `yaml:"online"`
-	Storage StorageConfig  `yaml:"storage"`
-	Proxy   *ProxyConfig   `yaml:"proxy,omitempty"`
-	Maven   *MavenConfig   `yaml:"maven,omitempty"`
-	Docker  *DockerConfig  `yaml:"docker,omitempty"`
-	Apt     *AptConfig     `yaml:"apt,omitempty"`
-	Cleanup *CleanupConfig `yaml:"cleanup,omitempty"`
+	// NameMode overrides Config.NameMode for this repository.
+	NameMode string         `yaml:"nameMode,omitempty"`
+	Name     string         `yaml:"name"`
+	Format   string         `yaml:"format"`
+	Type     string         `yaml:"type"`
+	Online   bool           `yaml:"online"`
+	Storage  StorageConfig  `yaml:"storage"`
+	Proxy    *ProxyConfig   `yaml:"proxy,omitempty"`
+	Maven    *MavenConfig   `yaml:"maven,omitempty"`
+	Docker   *DockerConfig  `yaml:"docker,omitempty"`
+	Apt      *AptConfig     `yaml:"apt,omitempty"`
+	Cleanup  *CleanupConfig `yaml:"cleanup,omitempty"`
 }
 
 // StorageConfig 存储配置
@@ -87,6 +94,8 @@ type CleanupConfig struct {
 
 // Privilege 权限配置
 type Privilege struct {
+	// NameMode overrides Config.NameMode for this privilege.
+	NameMode    string   `yaml:"nameMode,omitempty"`
 	Name        string   `yaml:"name"`
 	Description string   `yaml:"description"`
 	Type        string   `yaml:"type"`
@@ -97,6 +106,8 @@ type Privilege struct {
 
 // Role 角色配置
 type Role struct {
+	// NameMode overrides Config.NameMode for this role.
+	NameMode    string   `yaml:"nameMode,omitempty"`
 	ID          string   `yaml:"id"`
 	Name        string   `yaml:"name"`
 	Description string   `yaml:"description"`
