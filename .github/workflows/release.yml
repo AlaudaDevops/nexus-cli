@@ -40,6 +40,15 @@ jobs:
             goos: linux
             goarch: arm64
             artifact_name: nexus-cli-linux-arm64
+          # macOS
+          - os: ubuntu-latest # Cross-compile macOS binary on Linux runner
+            goos: darwin
+            goarch: amd64
+            artifact_name: nexus-cli-darwin-amd64
+          - os: ubuntu-latest # Cross-compile macOS binary on Linux runner
+            goos: darwin
+            goarch: arm64
+            artifact_name: nexus-cli-darwin-arm64
 
     steps:
       - name: Checkout code
