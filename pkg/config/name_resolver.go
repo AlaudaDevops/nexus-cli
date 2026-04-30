@@ -2,6 +2,7 @@
 package config
 
 import (
+	"crypto/rand"
 	"fmt"
 	"strings"
 	"time"
@@ -10,8 +11,17 @@ import (
 const (
 	// NameModeName keeps the configured resource names unchanged.
 	NameModeName = "name"
-	// NameModeSuffix appends a generated timestamp suffix to configured resource names.
+	// NameModeSuffix appends a generated unique suffix to configured resource names.
 	NameModeSuffix = "suffix"
+	// defaultRandomSuffixLength controls the random tail length for generated suffixes.
+	defaultRandomSuffixLength = 4
+)
+
+var (
+	// shortSuffixAlphabet contains safe lowercase alphanumeric characters for generated suffixes.
+	shortSuffixAlphabet = []byte("abcdefghijklmnopqrstuvwxyz0123456789")
+	// randomRead allows tests to exercise fallback branches without mutating crypto/rand internals.
+	randomRead = rand.Read
 )
 
 // ResolveNames resolves nameMode for all supported resources and rewrites references.
@@ -39,9 +49,11 @@ func (c *Config) ResolveNamesWithSuffix(suffix string) (*Config, error) {
 	return resolved, nil
 }
 
-// GenerateTimestampSuffix returns timestamp in the same format used by gitlab-cli.
+// GenerateTimestampSuffix returns a unique suffix in yyyyMMddHHmmssSSS-rand4 format.
 func GenerateTimestampSuffix() string {
-	return time.Now().Format("20060102150405")
+	now := time.Now()
+	millisecond := now.Nanosecond() / int(time.Millisecond)
+	return fmt.Sprintf("%s%03d-%s", now.Format("20060102150405"), millisecond, generateShortRandomSuffix(defaultRandomSuffixLength))
 }
 
 // resolveNamesWithSuffix performs a full nameMode resolution and returns whether suffix mode was applied.
@@ -202,6 +214,29 @@ func emailWithSuffix(email string, suffix string) string {
 		return withSuffix(email, suffix)
 	}
 	return fmt.Sprintf("%s+%s%s", email[:at], suffix, email[at:])
+}
+
+// generateShortRandomSuffix returns a short lowercase alphanumeric suffix.
+func generateShortRandomSuffix(length int) string {
+	if length <= 0 {
+		length = defaultRandomSuffixLength
+	}
+
+	rawRandomBytes := make([]byte, length)
+	if _, err := randomRead(rawRandomBytes); err != nil {
+		fallbackFromTime := fmt.Sprintf("%d", time.Now().UnixNano())
+		if len(fallbackFromTime) > length {
+			return fallbackFromTime[len(fallbackFromTime)-length:]
+		}
+		return fallbackFromTime
+	}
+
+	randomSuffix := make([]byte, length)
+	for i := range rawRandomBytes {
+		randomSuffix[i] = shortSuffixAlphabet[int(rawRandomBytes[i])%len(shortSuffixAlphabet)]
+	}
+
+	return string(randomSuffix)
 }
 
 // remapStrings remaps values using map and keeps unknown values unchanged.
