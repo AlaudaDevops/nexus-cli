@@ -103,7 +103,7 @@ Refer to `config/example.yaml` for more configuration options.
 `nameMode` controls how resource identifiers are generated before resources are created:
 
 - `name`: keep configured values unchanged (default behavior)
-- `suffix`: append an auto-generated timestamp suffix (format: `YYYYMMDDHHMMSS`)
+- `suffix`: append an auto-generated unique suffix (format: `YYYYMMDDHHMMSSmmm-rand4`)
 
 You can set `nameMode` globally and override it per resource:
 

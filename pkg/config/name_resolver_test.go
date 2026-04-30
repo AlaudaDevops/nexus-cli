@@ -1,6 +1,7 @@
 package config
 
 import (
+	"io"
 	"reflect"
 	"regexp"
 	"strings"
@@ -247,15 +248,96 @@ func TestResolveNamesGenerateSuffix(t *testing.T) {
 		t.Fatal("ResolveNames() suffix should not be empty in suffix mode")
 	}
 
-	matched, err := regexp.MatchString(`^[0-9]{14}$`, suffix)
+	matched, err := regexp.MatchString(`^[0-9]{17}-[a-z0-9]{4}$`, suffix)
 	if err != nil {
 		t.Fatalf("regexp.MatchString() error = %v", err)
 	}
 	if !matched {
-		t.Fatalf("ResolveNames() suffix format = %q, want 14-digit timestamp", suffix)
+		t.Fatalf("ResolveNames() suffix format = %q, want millisecond timestamp plus random tail", suffix)
 	}
 	if !strings.HasSuffix(resolved.Users[0].ID, "-"+suffix) {
 		t.Fatalf("resolved user id = %q should end with -%s", resolved.Users[0].ID, suffix)
+	}
+}
+
+// TestResolveNamesWithoutSuffixModeReturnsEmptyGeneratedSuffix verifies non-suffix mode does not expose a generated suffix.
+func TestResolveNamesWithoutSuffixModeReturnsEmptyGeneratedSuffix(t *testing.T) {
+	cfg := &Config{
+		Users: []User{
+			{ID: "repo-admin"},
+		},
+	}
+
+	resolved, suffix, err := cfg.ResolveNames()
+	if err != nil {
+		t.Fatalf("ResolveNames() error = %v", err)
+	}
+	if suffix != "" {
+		t.Fatalf("ResolveNames() suffix = %q, want empty", suffix)
+	}
+	if got, want := resolved.Users[0].ID, "repo-admin"; got != want {
+		t.Fatalf("resolved user id = %q, want %q", got, want)
+	}
+}
+
+// TestWithSuffixKeepsOriginalValueWhenSuffixingIsNotPossible verifies empty inputs do not change the original value.
+func TestWithSuffixKeepsOriginalValueWhenSuffixingIsNotPossible(t *testing.T) {
+	if got, want := withSuffix("", "20260324112233"), ""; got != want {
+		t.Fatalf("withSuffix() empty value = %q, want %q", got, want)
+	}
+	if got, want := withSuffix("repo-admin", ""), "repo-admin"; got != want {
+		t.Fatalf("withSuffix() empty suffix = %q, want %q", got, want)
+	}
+}
+
+// TestGenerateShortRandomSuffixUsesDefaultLength verifies non-positive lengths fall back to the default suffix length.
+func TestGenerateShortRandomSuffixUsesDefaultLength(t *testing.T) {
+	originalRandomRead := randomRead
+	randomRead = func(p []byte) (int, error) {
+		for i := range p {
+			p[i] = 0
+		}
+		return len(p), nil
+	}
+	defer func() {
+		randomRead = originalRandomRead
+	}()
+
+	got := generateShortRandomSuffix(0)
+	if got != "aaaa" {
+		t.Fatalf("generateShortRandomSuffix() = %q, want %q", got, "aaaa")
+	}
+}
+
+// TestGenerateShortRandomSuffixFallsBackToTime verifies random-reader failures still return numeric suffix material.
+func TestGenerateShortRandomSuffixFallsBackToTime(t *testing.T) {
+	originalRandomRead := randomRead
+	randomRead = func(_ []byte) (int, error) {
+		return 0, io.ErrClosedPipe
+	}
+	defer func() {
+		randomRead = originalRandomRead
+	}()
+
+	gotTrimmed := generateShortRandomSuffix(4)
+	matchedTrimmed, err := regexp.MatchString(`^[0-9]{4}$`, gotTrimmed)
+	if err != nil {
+		t.Fatalf("regexp.MatchString() error = %v", err)
+	}
+	if !matchedTrimmed {
+		t.Fatalf("generateShortRandomSuffix() trimmed fallback = %q, want 4 digits", gotTrimmed)
+	}
+
+	gotFull := generateShortRandomSuffix(64)
+	matchedFull, err := regexp.MatchString(`^[0-9]+$`, gotFull)
+	if err != nil {
+		t.Fatalf("regexp.MatchString() error = %v", err)
+	}
+	if !matchedFull {
+		t.Fatalf("generateShortRandomSuffix() full fallback = %q, want digits only", gotFull)
+	}
+	if len(gotFull) >= 64 {
+		t.Fatalf("generateShortRandomSuffix() full fallback length = %d, want less than 64", len(gotFull))
 	}
 }
 
