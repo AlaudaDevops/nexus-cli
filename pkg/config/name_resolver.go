@@ -66,120 +66,168 @@ func (c *Config) resolveNamesWithSuffix(suffix string) (*Config, bool, error) {
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid config.nameMode: %w", err)
 	}
-	// Prevalidate suffix once to avoid repeated checks in every resource loop.
-	if defaultMode == NameModeSuffix && suffix == "" {
-		return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
-	}
 
 	resolved := cloneConfig(c)
-	appliedSuffix := false
+	state := newNameResolutionState(resolved)
 
-	userIDMap := make(map[string]string, len(resolved.Users))
-	repositoryNameMap := make(map[string]string, len(resolved.Repositories))
-	roleIDMap := make(map[string]string, len(resolved.Roles))
-	privilegeNameMap := make(map[string]string, len(resolved.Privileges))
+	if err := resolveUsers(resolved.Users, defaultMode, suffix, state); err != nil {
+		return nil, false, err
+	}
+	if err := resolveRepositories(resolved.Repositories, defaultMode, suffix, state); err != nil {
+		return nil, false, err
+	}
+	if err := resolvePrivileges(resolved.Privileges, defaultMode, suffix, state); err != nil {
+		return nil, false, err
+	}
+	if err := resolveRoles(resolved.Roles, defaultMode, suffix, state); err != nil {
+		return nil, false, err
+	}
 
-	for i, user := range resolved.Users {
-		mode, err := normalizeNameMode(user.NameMode, defaultMode)
+	rewriteResolvedReferences(resolved, state)
+
+	clearNameModes(resolved)
+
+	return resolved, state.appliedSuffix, nil
+}
+
+// nameResolutionState tracks rewritten identifiers and whether suffix mode was used.
+type nameResolutionState struct {
+	appliedSuffix     bool
+	userIDMap         map[string]string
+	repositoryNameMap map[string]string
+	roleIDMap         map[string]string
+	privilegeNameMap  map[string]string
+}
+
+// newNameResolutionState allocates lookup maps sized for the target config.
+func newNameResolutionState(cfg *Config) *nameResolutionState {
+	return &nameResolutionState{
+		userIDMap:         make(map[string]string, len(cfg.Users)),
+		repositoryNameMap: make(map[string]string, len(cfg.Repositories)),
+		roleIDMap:         make(map[string]string, len(cfg.Roles)),
+		privilegeNameMap:  make(map[string]string, len(cfg.Privileges)),
+	}
+}
+
+// resolveResourceNameMode validates a resource-level nameMode and enforces suffix requirements.
+func resolveResourceNameMode(mode string, fallback string, fieldPath string, suffix string) (string, error) {
+	resolvedMode, err := normalizeNameMode(mode, fallback)
+	if err != nil {
+		return "", fmt.Errorf("invalid %s.nameMode: %w", fieldPath, err)
+	}
+	if resolvedMode == NameModeSuffix && suffix == "" {
+		return "", fmt.Errorf("nameMode suffix requires a non-empty suffix")
+	}
+	return resolvedMode, nil
+}
+
+// resolveUsers rewrites user identifiers and records the old-to-new mapping.
+func resolveUsers(users []User, defaultMode string, suffix string, state *nameResolutionState) error {
+	for i, user := range users {
+		mode, err := resolveResourceNameMode(user.NameMode, defaultMode, fmt.Sprintf("users[%d]", i), suffix)
 		if err != nil {
-			return nil, false, fmt.Errorf("invalid users[%d].nameMode: %w", i, err)
-		}
-		if mode == NameModeSuffix && suffix == "" {
-			return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+			return err
 		}
 
 		actualID := user.ID
 		if mode == NameModeSuffix {
-			appliedSuffix = true
+			state.appliedSuffix = true
 			actualID = withSuffix(user.ID, suffix)
-			resolved.Users[i].ID = actualID
-			resolved.Users[i].EmailAddress = emailWithSuffix(user.EmailAddress, suffix)
+			users[i].ID = actualID
+			users[i].EmailAddress = emailWithSuffix(user.EmailAddress, suffix)
 		}
-		userIDMap[user.ID] = actualID
+		state.userIDMap[user.ID] = actualID
 	}
 
-	for i, repository := range resolved.Repositories {
-		mode, err := normalizeNameMode(repository.NameMode, defaultMode)
+	return nil
+}
+
+// resolveRepositories rewrites repository names and records the old-to-new mapping.
+func resolveRepositories(repositories []Repository, defaultMode string, suffix string, state *nameResolutionState) error {
+	for i, repository := range repositories {
+		mode, err := resolveResourceNameMode(repository.NameMode, defaultMode, fmt.Sprintf("repositories[%d]", i), suffix)
 		if err != nil {
-			return nil, false, fmt.Errorf("invalid repositories[%d].nameMode: %w", i, err)
-		}
-		if mode == NameModeSuffix && suffix == "" {
-			return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+			return err
 		}
 
 		actualName := repository.Name
 		if mode == NameModeSuffix {
-			appliedSuffix = true
+			state.appliedSuffix = true
 			actualName = withSuffix(repository.Name, suffix)
-			resolved.Repositories[i].Name = actualName
+			repositories[i].Name = actualName
 		}
-		repositoryNameMap[repository.Name] = actualName
+		state.repositoryNameMap[repository.Name] = actualName
 	}
 
-	for i, privilege := range resolved.Privileges {
-		mode, err := normalizeNameMode(privilege.NameMode, defaultMode)
+	return nil
+}
+
+// resolvePrivileges rewrites privilege names and records the old-to-new mapping.
+func resolvePrivileges(privileges []Privilege, defaultMode string, suffix string, state *nameResolutionState) error {
+	for i, privilege := range privileges {
+		mode, err := resolveResourceNameMode(privilege.NameMode, defaultMode, fmt.Sprintf("privileges[%d]", i), suffix)
 		if err != nil {
-			return nil, false, fmt.Errorf("invalid privileges[%d].nameMode: %w", i, err)
-		}
-		if mode == NameModeSuffix && suffix == "" {
-			return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+			return err
 		}
 
 		actualName := privilege.Name
 		if mode == NameModeSuffix {
-			appliedSuffix = true
+			state.appliedSuffix = true
 			actualName = withSuffix(privilege.Name, suffix)
-			resolved.Privileges[i].Name = actualName
+			privileges[i].Name = actualName
 		}
-		privilegeNameMap[privilege.Name] = actualName
+		state.privilegeNameMap[privilege.Name] = actualName
 	}
 
-	for i, role := range resolved.Roles {
-		mode, err := normalizeNameMode(role.NameMode, defaultMode)
+	return nil
+}
+
+// resolveRoles rewrites role identifiers and records the old-to-new mapping.
+func resolveRoles(roles []Role, defaultMode string, suffix string, state *nameResolutionState) error {
+	for i, role := range roles {
+		mode, err := resolveResourceNameMode(role.NameMode, defaultMode, fmt.Sprintf("roles[%d]", i), suffix)
 		if err != nil {
-			return nil, false, fmt.Errorf("invalid roles[%d].nameMode: %w", i, err)
-		}
-		if mode == NameModeSuffix && suffix == "" {
-			return nil, false, fmt.Errorf("nameMode suffix requires a non-empty suffix")
+			return err
 		}
 
 		actualID := role.ID
 		if mode == NameModeSuffix {
-			appliedSuffix = true
+			state.appliedSuffix = true
 			actualID = withSuffix(role.ID, suffix)
-			resolved.Roles[i].ID = actualID
-			resolved.Roles[i].Name = withSuffix(role.Name, suffix)
+			roles[i].ID = actualID
+			roles[i].Name = withSuffix(role.Name, suffix)
 		}
-		roleIDMap[role.ID] = actualID
+		state.roleIDMap[role.ID] = actualID
 	}
 
-	for i := range resolved.Users {
-		resolved.Users[i].Roles = remapStrings(resolved.Users[i].Roles, roleIDMap)
+	return nil
+}
+
+// rewriteResolvedReferences updates cross-resource references after primary names are rewritten.
+func rewriteResolvedReferences(cfg *Config, state *nameResolutionState) {
+	for i := range cfg.Users {
+		cfg.Users[i].Roles = remapStrings(cfg.Users[i].Roles, state.roleIDMap)
 	}
 
-	for i := range resolved.Roles {
-		resolved.Roles[i].Privileges = remapStrings(resolved.Roles[i].Privileges, privilegeNameMap)
-		resolved.Roles[i].Roles = remapStrings(resolved.Roles[i].Roles, roleIDMap)
+	for i := range cfg.Roles {
+		cfg.Roles[i].Privileges = remapStrings(cfg.Roles[i].Privileges, state.privilegeNameMap)
+		cfg.Roles[i].Roles = remapStrings(cfg.Roles[i].Roles, state.roleIDMap)
 	}
 
-	for i := range resolved.Privileges {
-		if mappedRepo, ok := repositoryNameMap[resolved.Privileges[i].Repository]; ok {
-			resolved.Privileges[i].Repository = mappedRepo
-		}
-	}
-
-	for i := range resolved.UserRepositoryPermissions {
-		if mappedUser, ok := userIDMap[resolved.UserRepositoryPermissions[i].UserID]; ok {
-			resolved.UserRepositoryPermissions[i].UserID = mappedUser
-		}
-		if mappedRepo, ok := repositoryNameMap[resolved.UserRepositoryPermissions[i].Repository]; ok {
-			resolved.UserRepositoryPermissions[i].Repository = mappedRepo
+	for i := range cfg.Privileges {
+		if mappedRepo, ok := state.repositoryNameMap[cfg.Privileges[i].Repository]; ok {
+			cfg.Privileges[i].Repository = mappedRepo
 		}
 	}
 
-	clearNameModes(resolved)
-
-	return resolved, appliedSuffix, nil
+	for i := range cfg.UserRepositoryPermissions {
+		if mappedUser, ok := state.userIDMap[cfg.UserRepositoryPermissions[i].UserID]; ok {
+			cfg.UserRepositoryPermissions[i].UserID = mappedUser
+		}
+		if mappedRepo, ok := state.repositoryNameMap[cfg.UserRepositoryPermissions[i].Repository]; ok {
+			cfg.UserRepositoryPermissions[i].Repository = mappedRepo
+		}
+	}
 }
 
 // normalizeNameMode validates and normalizes a nameMode value.
