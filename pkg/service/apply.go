@@ -319,6 +319,15 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 		default:
 			return fmt.Errorf("go format only supports proxy and group types")
 		}
+	case "raw":
+		switch repo.Type {
+		case "hosted":
+			return s.client.CreateRawHostedRepository(req)
+		case "proxy":
+			return s.client.CreateRawProxyRepository(req)
+		case "group":
+			return s.client.CreateRawGroupRepository(req)
+		}
 	default:
 		return fmt.Errorf("unsupported repository format: %s", repo.Format)
 	}

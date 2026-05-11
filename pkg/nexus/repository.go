@@ -163,6 +163,33 @@ func (c *Client) CreateNpmGroupRepository(req RepositoryRequest) error {
 	return nil
 }
 
+// CreateRawHostedRepository 创建 Raw hosted 仓库
+func (c *Client) CreateRawHostedRepository(req RepositoryRequest) error {
+	_, err := c.post("/service/rest/v1/repositories/raw/hosted", req)
+	if err != nil {
+		return fmt.Errorf("failed to create raw hosted repository %s: %w", req.Name, err)
+	}
+	return nil
+}
+
+// CreateRawProxyRepository 创建 Raw proxy 仓库
+func (c *Client) CreateRawProxyRepository(req RepositoryRequest) error {
+	_, err := c.post("/service/rest/v1/repositories/raw/proxy", req)
+	if err != nil {
+		return fmt.Errorf("failed to create raw proxy repository %s: %w", req.Name, err)
+	}
+	return nil
+}
+
+// CreateRawGroupRepository 创建 Raw group 仓库
+func (c *Client) CreateRawGroupRepository(req RepositoryRequest) error {
+	_, err := c.post("/service/rest/v1/repositories/raw/group", req)
+	if err != nil {
+		return fmt.Errorf("failed to create raw group repository %s: %w", req.Name, err)
+	}
+	return nil
+}
+
 // GetRepository 获取仓库信息
 func (c *Client) GetRepository(name string) (map[string]interface{}, error) {
 	data, err := c.get(fmt.Sprintf("/service/rest/v1/repositories/%s", name))
