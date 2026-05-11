@@ -272,10 +272,15 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 		}
 	}
 
-	// 根据格式和类型调用相应的创建方法
-	switch repo.Format {
+	return s.dispatchRepositoryCreate(repo.Format, repo.Type, req)
+}
+
+// dispatchRepositoryCreate 根据 format/type 分发到具体的 Create*Repository 客户端调用。
+// 抽出为独立函数避免 createRepository 整体超过 gocyclo 复杂度阈值。
+func (s *ApplyService) dispatchRepositoryCreate(format, repoType string, req nexus.RepositoryRequest) error {
+	switch format {
 	case "maven2":
-		switch repo.Type {
+		switch repoType {
 		case "hosted":
 			return s.client.CreateMavenHostedRepository(req)
 		case "proxy":
@@ -284,7 +289,7 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 			return s.client.CreateMavenGroupRepository(req)
 		}
 	case "docker":
-		switch repo.Type {
+		switch repoType {
 		case "hosted":
 			return s.client.CreateDockerHostedRepository(req)
 		case "proxy":
@@ -293,7 +298,7 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 			return s.client.CreateDockerGroupRepository(req)
 		}
 	case "npm":
-		switch repo.Type {
+		switch repoType {
 		case "hosted":
 			return s.client.CreateNpmHostedRepository(req)
 		case "proxy":
@@ -302,7 +307,7 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 			return s.client.CreateNpmGroupRepository(req)
 		}
 	case "pypi":
-		switch repo.Type {
+		switch repoType {
 		case "hosted":
 			return s.client.CreatePypiHostedRepository(req)
 		case "proxy":
@@ -311,7 +316,7 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 			return s.client.CreatePypiGroupRepository(req)
 		}
 	case "go":
-		switch repo.Type {
+		switch repoType {
 		case "proxy":
 			return s.client.CreateGoProxyRepository(req)
 		case "group":
@@ -320,7 +325,7 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 			return fmt.Errorf("go format only supports proxy and group types")
 		}
 	case "raw":
-		switch repo.Type {
+		switch repoType {
 		case "hosted":
 			return s.client.CreateRawHostedRepository(req)
 		case "proxy":
@@ -329,10 +334,10 @@ func (s *ApplyService) createRepository(repo config.Repository) error {
 			return s.client.CreateRawGroupRepository(req)
 		}
 	default:
-		return fmt.Errorf("unsupported repository format: %s", repo.Format)
+		return fmt.Errorf("unsupported repository format: %s", format)
 	}
 
-	return fmt.Errorf("unsupported repository type: %s for format: %s", repo.Type, repo.Format)
+	return fmt.Errorf("unsupported repository type: %s for format: %s", repoType, format)
 }
 
 // applyUsers 应用用户配置
